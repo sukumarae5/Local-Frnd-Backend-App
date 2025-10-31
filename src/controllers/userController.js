@@ -1,15 +1,55 @@
-const userService= require('../services/userServices')
+// const profileService = require("../services/userServices");
 
-exports.updateProfile = async (req, res) => {
-    try {
-        const {mobile_number, ...userData}=req.body;
-        console.log("req data", req.body)
-        console.log("Updating profile for mobile number:", mobile_number);
+// // Get all users
+// exports.getAllUsers = async (req, res) => {
+//   try {
+//     const result = await profileService.getAllUsers();
+//     res.json(result);
+//   } catch (error) {
+//     res.status(500).json({ success: false, message: error.message });
+//   }
+// };
 
-        const result= await userService.updateProfile(mobile_number, userData);
-        res.status(200).json(result)
+// // Get profile by ID
+// exports.getProfileById = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const result = await profileService.getProfileById(id);
+//     res.json(result);
+//   } catch (error) {
+//     res.status(500).json({ success: false, message: error.message });
+//   }
+// };
 
-    } catch (error) {
-        res.status(500).json({ success: false, message: "Internal Server Error", error: error.message });
-    }
-};
+// // Update profile
+// exports.updateProfile = async (req, res) => {
+//   try {
+//     const user_id  = req.params.id;
+//     const userData = req.body;
+//     console.log(req.body)
+//     console.log(req.params.id)
+//     if (!user_id)
+//       return res.status(400).json({ success: false, message: "user id is required" });
+
+//     const result = await profileService.updateProfile(user_id, userData);
+//     res.json(result);
+//   } catch (error) {
+//     res.status(500).json({ success: false, message: error.message });
+//   }
+// };
+
+
+// exports.deleteUserId = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+
+//     if (!id) {
+//       return res.status(400).json({ success: false, message: "User ID is required" });
+//     }
+
+//     const result = await profileService.deleteUserId(id);
+//     res.json(result);
+//   } catch (error) {
+//     res.status(500).json({ success: false, message: error.message });
+//   }
+// };

@@ -1,11 +1,20 @@
 const db=require("../config/db")
 
 const findByMobile = async (mobile_number) => {
+    console.log("Finding user by mobile number:", mobile_number);
     const [rows]=await db.execute('SELECT * from user WHERE mobile_number=?',
         [mobile_number]
     )
     return rows[0]
 }
+
+const createUserIfNotExist = async (mobile_number) => {
+  const [result] = await db.execute(
+    "INSERT IGNORE INTO user (mobile_number) VALUES (?)",
+    [mobile_number]
+  );
+  return result;
+};
 
 const findByMobileAndOtp= async (mobile_number, otp) => {
     const [rows] =await db.execute('SELECT * from user WHERE mobile_number=? AND otp=?',
@@ -26,7 +35,12 @@ const clearOtp = async (mobile_number) => {
     )
 }
 
-const updateProfile =async (mobile_number, userData) => {
+const findById=async (id) => {
+    const [rows]=await db.execute(`SELECT * from user WHERE user_id=?`, [id])
+    return rows[0]    
+}
+
+const updateProfile =async (user_id, userData) => {
     const fields =[]
     const values=[]
     for (const key in userData){
@@ -34,10 +48,10 @@ const updateProfile =async (mobile_number, userData) => {
         values.push(userData[key])
     }
     if (fields.length === 0) {
-        return;
+        return { affectedRows: 0 };
     }
-    values.push(mobile_number)
-    const [result]= await db.execute(`UPDATE user SET ${fields.join(`, `)} WHERE mobile_number=?`, values)
+    values.push(user_id)
+    const [result]= await db.execute(`UPDATE user SET ${fields.join(`, `)} WHERE user_id=?`, values)
     return result
 }
 
@@ -48,11 +62,19 @@ const getAllUsers= async () => {
 
 } 
 
+const deleteUserId= async (user_id) => {
+    const [result]=await db.execute('DELETE from user WHERE user_id=?', [user_id])
+    return result
+}
+
 module.exports={
+    createUserIfNotExist,
     findByMobile,
     findByMobileAndOtp,
     createOrUpdateOtp,
     clearOtp,
+    findById,
     updateProfile,
-    getAllUsers
+    getAllUsers,
+    deleteUserId
 }
