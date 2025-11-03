@@ -1,4 +1,4 @@
-// const userModel = require("../models/user");
+const userModel = require("../models/user");
 
 // // Get all users
 // const getAllUsers = async () => {
@@ -14,34 +14,34 @@
 // };  
 
 
-// const updateProfile = async (user_id, userData) => {
+const updateProfile = async (user_id, userData) => {
     
-//   const user = await userModel.findById(user_id);
-//   if (!user) throw new Error("User not found");
+  const user = await userModel.findById(user_id);
+  if (!user) throw new Error("User not found");
 
 
-//   const requiredFields = ["name", "age", "gender", "location_lat", "location_log"];
-//  const missingFields = requiredFields.filter(
-//     (field) => !userData[field] || userData[field].toString().trim() === ""
-//   );
-//    if (missingFields.length > 0) {
-//     throw new Error(`Missing required fields: ${missingFields.join(", ")}`);
-//   }
-//   const allowedGenders = ["Male", "Female"];
-//   if (!allowedGenders.includes(userData.gender)) {
-//     throw new Error(`Invalid gender value. Allowed: ${allowedGenders.join(", ")}`);
-//   }
-//   if (isNaN(userData.age)) throw new Error("Age must be a number");
+  const requiredFields = ["name", "age", "gender", "location_lat", "location_log"];
+ const missingFields = requiredFields.filter(
+    (field) => !userData[field] || userData[field].toString().trim() === ""
+  );
+   if (missingFields.length > 0) {
+    throw new Error(`Missing required fields: ${missingFields.join(", ")}`);
+  }
+  const allowedGenders = ["Male", "Female"];
+  if (!allowedGenders.includes(userData.gender)) {
+    throw new Error(`Invalid gender value. Allowed: ${allowedGenders.join(", ")}`);
+  }
+  if (isNaN(userData.age)) throw new Error("Age must be a number");
 
-//   userData.profile_status = "verified";
-//   userData.status = "active";
-//   userData.updates_at = new Date();
+  userData.profile_status = "verified";
+  userData.status = "active";
+  userData.updates_at = new Date();
 
-//   const result = await userModel.updateProfile(user_id, userData);
-//   if (result.affectedRows === 0) throw new Error("No fields updated");
+  const result = await userModel.updateProfile(user_id, userData);
+  if (result.affectedRows === 0) throw new Error("No fields updated");
 
-//   return { success: true, message: "Profile updated successfully" };
-// };
+  return { success: true, message: "Profile updated successfully" };
+};
  
 // const deleteUserId=async (user_id) => {
 //   const user=await userModel.findById(user_id)
@@ -52,9 +52,9 @@
 //     return {success:true, message:"user deleted successfully"}
 // }
 
-// module.exports = {
+module.exports = {
 //   getAllUsers,
 //   getProfileById,
-//   updateProfile,
+  updateProfile,
 //   deleteUserId
-// };
+};

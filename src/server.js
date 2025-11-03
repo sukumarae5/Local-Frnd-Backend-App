@@ -3,7 +3,7 @@ const cors=require("cors")
 const db=require("./config/db")
 
 const authRoutes = require("./routes/authRoutes")
-// const userRoutes= require('./routes/userRoutes')
+const userRoutes= require('./routes/userRoutes')
 
 
 const app=express();
@@ -22,7 +22,7 @@ app.get("/api/user",(req, res)=>{
 })
 
 app.use('/api/auth', authRoutes)
-// app.use('/api/user', userRoutes)
+app.use('/api/user', userRoutes)
 
 
 
