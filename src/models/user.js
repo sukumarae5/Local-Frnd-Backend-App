@@ -1,5 +1,6 @@
 const db=require("../config/db")
 
+
 const findByMobile = async (mobile_number) => {
     console.log("Finding user by mobile number:", mobile_number);
     const [rows]=await db.execute('SELECT * from user WHERE mobile_number=?',
@@ -39,6 +40,13 @@ const findById=async (id) => {
     const [rows]=await db.execute(`SELECT * from user WHERE user_id=?`, [id])
     return rows[0]    
 }
+const updateCoinBalance = async (user_id, coins) => {
+    const [result] = await db.execute(
+        `UPDATE user SET coin_balance = coin_balance + ? WHERE user_id=?`,
+        [coins, user_id]
+    );
+    return result;
+};
 
 const updateProfile =async (user_id, userData) => {
     const fields =[]
@@ -54,6 +62,9 @@ const updateProfile =async (user_id, userData) => {
     const [result]= await db.execute(`UPDATE user SET ${fields.join(`, `)} WHERE user_id=?`, values)
     return result
 }
+
+
+
 
 
 const getAllUsers= async () => {
@@ -75,6 +86,7 @@ module.exports={
     clearOtp,
     findById,
     updateProfile,
+    updateCoinBalance,
     getAllUsers,
     deleteUserId
 }

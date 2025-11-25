@@ -1,15 +1,14 @@
 import jwt from "jsonwebtoken";
 
 export const generateToken = (user) => {
-  console.log(user)
+  console.log(user);
   try {
     const payload = {
-      user_id:user.user_id
+      user_id: user.user_id,
     };
 
-    // Generate token with 1 hour expiry
     const token = jwt.sign(payload, process.env.JWT_SECRET, {
-      expiresIn: "7d", // token validity
+      expiresIn: "7d",
     });
 
     return token;
