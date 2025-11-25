@@ -18,22 +18,22 @@ const registerUser = async (mobile_number) => {
 
   return {
     success: true,
+    mode:"register",      
     message: "User registered. OTP sent successfully for verification.",
   };
 };
 
-// ✅ Send OTP for login (only if user exists)
 const sendLoginOtp = async (mobile_number) => {
   const user = await userModel.findByMobile(mobile_number);
   if (!user) {
     return { success: false, message: "User not found. Please register first." };
   }
 
-  const otp = generateOtp();
+  const otp = generateOtp();    
   await userModel.createOrUpdateOtp(mobile_number, otp);
   console.log(`📲 Login OTP for ${mobile_number} is ${otp}`);
 
-  return { success: true, message: "OTP sent successfully for login." };
+  return { success: true,mode:"login", message: "OTP sent successfully for login." };
 };
 
 
