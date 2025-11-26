@@ -32,14 +32,13 @@ const isProfileComplete = async (user_id) => {
 
   return Boolean(
     user.name &&
-    user.mobile_number &&
-    user.age &&
-    user.gender &&
-    user.location_lat &&
-    user.location_log
+      user.mobile_number &&
+      user.age &&
+      user.gender &&
+      user.location_lat &&
+      user.location_log
   );
 };
-
 
 const updateProfile = async (user_id, userData) => {
   const user = await userModel.findById(user_id);
@@ -91,8 +90,8 @@ const updateProfile = async (user_id, userData) => {
 
   const userPhoto = await photoModel.findPrimaryByUserId(user_id);
   console.log("isProfileComplete:", completed);
-console.log("userPhoto:", userPhoto);
-console.log("user.profile_status:", user.profile_status);
+  console.log("userPhoto:", userPhoto);
+  console.log("user.profile_status:", user.profile_status);
 
   if (completed && !userPhoto) {
     return {
@@ -101,6 +100,7 @@ console.log("user.profile_status:", user.profile_status);
         "Profile details updated. Please upload a profile photo to complete your profile and earn 50 LC.",
       next_step: "upload_photo",
       reward_pending: 50,
+      user: updatedUser,
     };
   }
 
@@ -115,9 +115,11 @@ console.log("user.profile_status:", user.profile_status);
       message: "Profile completed & verified — 50 LC rewarded!",
       reward: 50,
       status: "active",
+            user: updatedUser,
+
     };
   }
-  return { success: true, message: "Profile updated successfully" };
+  return { success: true, message: "Profile updated successfully", user: updatedUser };
 };
 
 const deleteUserId = async (user_id) => {
