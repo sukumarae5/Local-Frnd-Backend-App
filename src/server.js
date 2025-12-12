@@ -1,18 +1,23 @@
 const express = require('express');
 const cors=require("cors")
-const db=require("./config/db")
 const multer=require('multer')
 const upload=multer({dest:'uploads/'})
+const socketIO = require('socket.io');
+const { init } = require('./socket');
+
 
 const authRoutes = require("./routes/authRoutes")
 const userRoutes= require('./routes/userRoutes')
 const photoRoutes=require('./routes/photoRoutes')
-
+const profileRoutes=require('./routes/profileRoutes')
+const callRoutes= require('./routes/callRoutes')
 
 const app=express();
 
 app.use(cors())
-app.use(express.json());
+ 
+app.use(express.json({ limit: "1mb" }));           // for JSON
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
 app.use((req, res, next) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
@@ -44,13 +49,29 @@ app.get("/api/user",(req, res)=>{
 app.use('/api/auth', authRoutes)
 app.use('/api/user', userRoutes)
 app.use('/api/photo', photoRoutes)
+app.use('/api/userprofile',profileRoutes)
+app.use('/api/call', callRoutes)
+
 app.use("/uploads", express.static("uploads"));
 
 
+app.use(express.json({ limit: "50mb" }));
 
 const port=8082
-app.listen(port,"0.0.0.0",()=>{
-    console.log("server is running")
+// app.listen(port,"0.0.0.0",()=>{
+//     console.log("server is running")
+//     console.log("server is running on port", port)
+// })
+
+const server= app.listen(port,"0.0.0.0",()=>{
     console.log("server is running on port", port)
 })
- 
+    
+const io = socketIO(server, {
+    cors: {
+      origin: "*",                       
+    },
+});     
+
+init(io)
+module.exports = { app, server, io };

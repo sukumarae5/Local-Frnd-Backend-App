@@ -64,9 +64,6 @@ const updateProfile =async (user_id, userData) => {
 }
 
 
-
-
-
 const getAllUsers= async () => {
     const [rows] =await db.execute('SELECT * from user')
     return rows
@@ -78,6 +75,67 @@ const deleteUserId= async (user_id) => {
     return result
 }
 
+const getRandomUsers = async (currentUserId) => {
+  const [rows] = await db.execute(
+    `
+        SELECT 
+      u.user_id,
+      u.name,
+      COALESCE(p.photo_url, "") AS primary_image
+    FROM user u
+    LEFT JOIN profile_photo p 
+      ON u.user_id = p.user_id 
+      AND p.is_primary = 1
+    WHERE u.user_id != ?
+      AND u.is_online = 1
+    ORDER BY RAND()
+    LIMIT 20
+    `,    
+    [currentUserId]
+  );
+  return rows;
+};
+
+const getProfileById=async (user_id) => {
+     const [rows] = await db.execute(
+    `
+    SELECT user_id, name, username, mobile_number, email, age, date_of_birth,
+           gender, bio, profile_status, status, coin_balance, location_lat,
+           location_log, is_online, last_seen
+    FROM users
+    WHERE user_id = ?
+    `,
+    [user_id]
+  );
+
+  return rows[0] || null;
+}
+
+const isUserOnline = async (userId) => {
+  const [rows] = await db.execute(
+    `SELECT is_online FROM user WHERE user_id = ? LIMIT 1`,
+    [userId]
+  );
+  return rows.length ? rows[0].is_online === 1 : false;
+};
+
+const getRandomOnlineUser = async (currentUserId) => {
+  const [rows] = await db.execute(
+    `
+      SELECT user_id, name 
+      FROM user
+      WHERE user_id != ?
+        AND is_online = 1
+      ORDER BY RAND()
+      LIMIT 1
+    `,
+    [currentUserId]
+  );
+
+  return rows[0] || null;
+};
+
+
 module.exports={
     createUserIfNotExist,
     findByMobile,
@@ -88,5 +146,9 @@ module.exports={
     updateProfile,
     updateCoinBalance,
     getAllUsers,
-    deleteUserId
+    deleteUserId,
+    getRandomUsers,
+    getProfileById,
+    isUserOnline,
+    getRandomOnlineUser
 }

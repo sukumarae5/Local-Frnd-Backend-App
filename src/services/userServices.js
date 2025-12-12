@@ -40,96 +40,126 @@ const isProfileComplete = async (user_id) => {
   );
 };
 
-const updateProfile = async (user_id, userData) => {
+const updateProfile = async (user_id, data) => {
   const user = await userModel.findById(user_id);
   if (!user) throw new Error("User not found");
 
-  const requiredFields = [
-    "name",
-    "age",
-    "gender",
-    "location_lat",
-    "location_log",
-  ];
-  const missingFields = requiredFields.filter(
-    (field) => !userData[field] || userData[field].toString().trim() === ""
-  );
-  if (missingFields.length > 0) {
-    throw new Error(`Missing required fields: ${missingFields.join(", ")}`);
-  }
-
-  const allowedGenders = ["Male", "Female"];
-  if (!allowedGenders.includes(userData.gender)) {
-    throw new Error(
-      `Invalid gender value. Allowed: ${allowedGenders.join(", ")}`
-    );
-  }
-
-  if (userData.bio) {
-    if (userData.bio.length > 500) {
-      throw new Error("Bio cannot exceed 500 characters");
-    }
-
-    if (containsProfanity(userData.bio)) {
-      throw new Error("Bio contains inappropriate language");
-    }
-  }
-
-  if (isNaN(userData.age)) {
-    throw new Error("Age must be a number");
-  }
-
-  if (parseInt(userData.age) < 18) {
-    throw new Error("Age must be greater than or equal to 18");
-  }
-
-  userData.updates_at = new Date();
-  await userModel.updateProfile(user_id, userData);
-
-  const completed = await isProfileComplete(user_id);
-
-  const userPhoto = await photoModel.findPrimaryByUserId(user_id);
-  console.log("isProfileComplete:", completed);
-  console.log("userPhoto:", userPhoto);
-  console.log("user.profile_status:", user.profile_status);
-
-  if (completed && !userPhoto) {
+  // Validate required fields
+  const required = ["name", "age", "gender", "location_lat", "location_log"];
+  const missing = required.filter(field => !data[field]);
+  
+  if (missing.length) {
     return {
-      success: true,
-      message:
-        "Profile details updated. Please upload a profile photo to complete your profile and earn 50 LC.",
-      next_step: "upload_photo",
-      reward_pending: 50,
-      user: updatedUser,
+      success: false,
+      message: `Missing fields: ${missing.join(", ")}`
     };
   }
 
-  if (completed && userPhoto && user.profile_status !== "verified") {
+  // Gender validation
+  if (!["Male", "Female"].includes(data.gender)) {
+    return { success: false, message: "Invalid gender" };
+  }
+
+  // Bio validation
+  if (data.bio) {
+    if (data.bio.length > 500)
+      return { success: false, message: "Bio cannot exceed 500 characters" };
+
+    if (containsProfanity(data.bio))
+      return { success: false, message: "Bio contains inappropriate words" };
+  }
+
+  // Update user
+  data.updates_at = new Date();
+  await userModel.updateProfile(user_id, data);
+
+  // Check completeness
+  const completed = await isProfileComplete(user_id);
+  const primaryPhoto = await photoModel.findPrimaryByUserId(user_id);
+
+  // Case: complete but no photo
+  if (completed && !primaryPhoto) {
+    return {
+      success: true,
+      message: "Profile updated. Add a photo to complete verification.",
+      next_step: "upload_photo",
+      reward_pending: 50
+    };
+  }
+
+  // Case: complete + photo exists → reward
+  if (completed && primaryPhoto && user.profile_status !== "verified") {
     await userModel.updateCoinBalance(user_id, 50);
     await userModel.updateProfile(user_id, {
       profile_status: "verified",
-      status: "active",
+      status: "active"
     });
+
     return {
       success: true,
-      message: "Profile completed & verified — 50 LC rewarded!",
-      reward: 50,
-      status: "active",
-            user: updatedUser,
-
+      message: "Profile verified — 50 LC rewarded!",
+      reward: 50
     };
   }
-  return { success: true, message: "Profile updated successfully", user: updatedUser };
+
+  return { success: true, message: "Profile updated successfully" };
 };
 
-const deleteUserId = async (user_id) => {
+     
+const deleteUserId = async (user_id) => {  
   const user = await userModel.findById(user_id);
-  if (!user) throw new Error("user not found");
+  if (!user) throw new Error("user not found");  
 
   const result = await userModel.deleteUserId(user_id);
   if (result.affectedRows === 0) throw new Error("user not deleted");
   return { success: true, message: "user deleted successfully" };
 };
+
+const getRandomUsers = async (currentUserId) => {
+  console.log(currentUserId);
+  
+  if (!currentUserId) {
+    throw new Error("Current user ID is required");
+  }
+
+  const users = await userModel.getRandomUsers(currentUserId);
+
+  return {
+    success: true,
+    total: users.length,
+    users,
+  };
+};
+
+const connectRandomUser = async (currentUserId) => {
+  const user = await userModel.getRandomOnlineUser(currentUserId);
+
+  if (!user) {
+    return { success: false, message: "No online users available" };
+  }
+
+  return {
+    success: true,
+    message: "User found",
+    user,
+  };
+};
+
+const connectToSpecificUser = async (currentUserId, targetUserId) => {
+  const isOnline = await userModel.isUserOnline(targetUserId);
+
+  if (!isOnline) {
+    return { success: false, message: "User is offline" };
+  }
+
+  return {
+    success: true,
+    message: "User is online, you can connect",
+    targetUserId,
+  };
+};
+
+
 
 module.exports = {
   getAllUsers,
@@ -137,4 +167,7 @@ module.exports = {
   updateProfile,
   isProfileComplete,
   deleteUserId,
+  getRandomUsers,
+  connectRandomUser,
+  connectToSpecificUser
 };

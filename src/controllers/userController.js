@@ -51,3 +51,35 @@ exports.deleteUserId = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+exports.getRandomUsers = async (req, res) => {
+  try {
+    const currentUserId = req.user.user_id; 
+
+    const result = await profileService.getRandomUsers(currentUserId);
+
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.connectRandom = async (req, res) => {
+  const currentUserId = req.user.user_id;
+
+  const result = await profileService.connectRandomUser(currentUserId);
+
+  res.json(result);
+};
+
+exports.connectUser = async (req, res) => {
+  const currentUserId = req.user.user_id;
+  const { targetUserId } = req.body;
+
+  const result = await profileService.connectToSpecificUser(
+    currentUserId,
+    targetUserId
+  );
+
+  res.json(result);
+};

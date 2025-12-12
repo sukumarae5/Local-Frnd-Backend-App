@@ -8,7 +8,7 @@ export const authenticateUser = (req, res, next) => {
     return res.status(401).json({ success: false, message: "Authorization header missing" });
   }
 
-  const token = authHeader.split(" ")[1]; // Expecting "Bearer <token>"
+  const token = authHeader.split(" ")[1];
 
   if (!token) {
     return res.status(401).json({ success: false, message: "Token missing" });
@@ -16,8 +16,8 @@ export const authenticateUser = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded; // Add decoded data to request
-    next(); // Proceed to controller
+    req.user = decoded; 
+    next(); 
   } catch (error) {
     console.error("Token verification failed:", error);
     return res.status(403).json({ success: false, message: "Invalid or expired token" });
