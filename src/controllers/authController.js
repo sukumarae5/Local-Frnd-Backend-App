@@ -35,6 +35,7 @@ exports.sendLoginOtp = async (req, res) => {
 };
 
 // Verify OTP
+
 exports.verifyOtp = async (req, res) => {
   try {
     const { mobile_number, otp } = req.body;
