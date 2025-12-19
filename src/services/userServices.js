@@ -1,5 +1,7 @@
 const userModel = require("../models/user");
 const photoModel = require("../models/photoModel");
+const avatarModel = require("../models/avatarModel");
+
 
 const bannedWords = [
   "badword1",
@@ -27,25 +29,167 @@ const getProfileById = async (id) => {
   return { success: true, user };
 };
 
+const hasVisualIdentity = async (user) => {
+  if (user.avatar_id) return true;
+
+  const primaryPhoto = await photoModel.findPrimaryByUserId(user.user_id);
+  return Boolean(primaryPhoto);
+};
+
 const isProfileComplete = async (user_id) => {
   const user = await userModel.findById(user_id);
 
   return Boolean(
-    user.name &&
+   
       user.mobile_number &&
       user.age &&
       user.gender &&
+      user.language_id &&
       user.location_lat &&
       user.location_log
   );
+};
+
+const parseDateOfBirth = (dobStr) => {
+  if (!dobStr || typeof dobStr !== "string") return null;
+
+  // YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dobStr)) {
+    const d = new Date(dobStr);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  // DD-MM-YYYY
+  if (/^\d{2}-\d{2}-\d{4}$/.test(dobStr)) {
+    const [day, month, year] = dobStr.split("-").map(Number);
+    const d = new Date(year, month - 1, day);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  return null;
+};
+
+
+const patchProfile = async (user_id, data) => {
+  const user = await userModel.findById(user_id);
+  if (!user) throw new Error("User not found")
+
+  if (data.date_of_birth) {
+    const dob = parseDateOfBirth(data.date_of_birth);
+    if (!dob) {
+      return {
+        success: false,
+        message: "Invalid date_of_birth format. Use YYYY-MM-DD or DD-MM-YYYY"
+      };
+    }
+
+    const today = new Date();
+    let age = today.getFullYear() - dob.getFullYear();
+    const m = today.getMonth() - dob.getMonth();
+
+    if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+      age--;
+    }
+
+    if (age < 18) {
+      return { success: false, message: "Age must be 18 or above" };
+    }
+
+    data.age = age;
+    data.date_of_birth = dob.toISOString().split("T")[0];
+  }
+
+  // If age is provided directly → validate
+  if (data.age !== undefined) {
+    const age = Number(data.age);
+
+    if (Number.isNaN(age)) {
+      return { success: false, message: "Age must be a number" };
+    }
+
+    if (age < 18) {
+      return { success: false, message: "Age must be 18 or above" };
+    }
+  }   
+
+   if (data.gender !== undefined) {
+    if (data.gender !== "Male" && data.gender !== "Female") {
+      return {
+        success: false,
+        message: "Enter gender as 'Male' or 'Female'"
+      };
+    }
+  }
+
+  if (data.bio) {
+    if (data.bio.length > 500) {
+      return { success: false, message: "Bio too long (max 500 chars)" };
+    }
+    if (containsProfanity(data.bio)) {
+      return { success: false, message: "Bio contains inappropriate words" };
+    }
+  }
+
+  if (data.avatar_id !== undefined) {
+    const avatar = await avatarModel.findById(data.avatar_id);
+    if (!avatar) return { success: false, message: "Avatar not found" };
+    if (avatar.gender !== user.gender) {
+      return { success: false, message: "Avatar gender mismatch" };
+    }
+  }
+
+  data.updates_at = new Date();
+
+  const result = await userModel.updateProfile(user_id, data);
+
+  if (result.affectedRows === 0) {
+    return { success: false, message: "Nothing updated" };
+  }
+   const updatedUser = await userModel.findById(user_id);
+
+  if (updatedUser.profile_status === "verified") {
+    return { success: true, message: "Profile updated successfully" };
+  }
+const isComplete = await isProfileComplete(user_id);
+  const hasAvatar = Boolean(updatedUser.avatar_id);
+
+  
+
+  if (isComplete && !hasAvatar) {
+    return {
+      success: true,
+      message: "Profile updated. Please select an avatar to complete verification.",
+      next_step: "select_avatar",
+      reward_pending: 50,
+    };
+  }
+   
+   if (isComplete && hasAvatar) {
+    await userModel.updateCoinBalance(user_id, 50);
+
+    await userModel.updateProfile(user_id, {
+      profile_status: "verified",
+      status: "active",
+    });
+
+    return {
+      success: true,
+      message: "Profile verified successfully",
+      reward: 50,
+    };
+  }
+
+  return {
+    success: true,
+    message: "Profile updated successfully",
+  };
 };
 
 const updateProfile = async (user_id, data) => {
   const user = await userModel.findById(user_id);
   if (!user) throw new Error("User not found");
 
-  // Validate required fields
-  const required = ["name", "age", "gender", "location_lat", "location_log"];
+  const required = ["date_of_birth", "gender","language_id", "location_lat", "location_log"];
   const missing = required.filter(field => !data[field]);
   
   if (missing.length) {
@@ -55,12 +199,46 @@ const updateProfile = async (user_id, data) => {
     };
   }
 
-  // Gender validation
-  if (!["Male", "Female"].includes(data.gender)) {
-    return { success: false, message: "Invalid gender" };
+   if (data.date_of_birth) {
+    const dob = parseDateOfBirth(data.date_of_birth);
+    if (!dob) {
+      return {
+        success: false,
+        message: "Invalid date_of_birth format. Use YYYY-MM-DD or DD-MM-YYYY"
+      };
+    }
+
+    const today = new Date();
+    let age = today.getFullYear() - dob.getFullYear();
+    const m = today.getMonth() - dob.getMonth();
+
+    if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+      age--;
+    }
+
+    if (age < 18) {
+      return { success: false, message: "Age must be 18 or above" };
+    }
+
+    data.age = age;
+    data.date_of_birth = dob.toISOString().split("T")[0];
   }
 
-  // Bio validation
+  if (data.gender !== "Male" && data.gender !== "Female") {
+    return {
+      success: false,
+      message: "Enter gender as 'Male' or 'Female'"
+    };
+  }
+
+ if (data.avatar_id !== undefined) {
+    const avatar = await avatarModel.findById(data.avatar_id);
+    if (!avatar) return { success: false, message: "Avatar not found" };
+    if (avatar.gender !== user.gender) {
+      return { success: false, message: "Avatar gender mismatch" };
+    }
+  }
+
   if (data.bio) {
     if (data.bio.length > 500)
       return { success: false, message: "Bio cannot exceed 500 characters" };
@@ -73,34 +251,39 @@ const updateProfile = async (user_id, data) => {
   data.updates_at = new Date();
   await userModel.updateProfile(user_id, data);
 
-  // Check completeness
-  const completed = await isProfileComplete(user_id);
-  const primaryPhoto = await photoModel.findPrimaryByUserId(user_id);
+  const updatedUser = await userModel.findById(user_id);
 
-  // Case: complete but no photo
-  if (completed && !primaryPhoto) {
+  if (updatedUser.profile_status === "verified") {
+    return { success: true, message: "Profile updated successfully" };
+  }
+
+  const isComplete = await isProfileComplete(user_id);
+  const hasAvatar = Boolean(updatedUser.avatar_id);
+
+  if (isComplete && !hasAvatar) {
     return {
       success: true,
-      message: "Profile updated. Add a photo to complete verification.",
-      next_step: "upload_photo",
-      reward_pending: 50
+      message: "Profile updated. Select an avatar to complete verification.",
+      next_step: "select_avatar",
+      reward_pending: 50,
     };
   }
 
-  // Case: complete + photo exists → reward
-  if (completed && primaryPhoto && user.profile_status !== "verified") {
+   if (isComplete && hasAvatar) {
     await userModel.updateCoinBalance(user_id, 50);
+
     await userModel.updateProfile(user_id, {
       profile_status: "verified",
-      status: "active"
+      status: "active",
     });
 
     return {
       success: true,
-      message: "Profile verified — 50 LC rewarded!",
-      reward: 50
+      message: "Profile verified — 50 coins rewarded!",
+      reward: 50,
     };
   }
+
 
   return { success: true, message: "Profile updated successfully" };
 };
@@ -164,6 +347,7 @@ const connectToSpecificUser = async (currentUserId, targetUserId) => {
 module.exports = {
   getAllUsers,
   getProfileById,
+  patchProfile,
   updateProfile,
   isProfileComplete,
   deleteUserId,

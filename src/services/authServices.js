@@ -41,14 +41,17 @@ const verifyOtp = async (mobile_number, otp) => {
   const user = await userModel.findByMobileAndOtp(mobile_number, otp);
   if (!user) return { success: false, message: "Invalid number or OTP" };
 
-  const token = generateToken(user);
+  await userModel.createUserIfNotExist(mobile_number);
   await userModel.clearOtp(mobile_number);
+
+  const freshUser = await userModel.findByMobile(mobile_number);
+  const token = generateToken(freshUser);
 
   return {
     success: true,
-    message: "OTP verified successfully",
     token,
-    user,
+    user: freshUser,
+    next_step: freshUser.profile_completed ? "home" : "complete_profile"
   };
 };
 

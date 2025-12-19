@@ -88,3 +88,15 @@ exports.deletePhotoById = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+exports.setPrimaryPhoto = async (req, res) => {
+  try {
+    const { user_id, photo_id } = req.params;
+
+    const result = await photoService.setPrimaryPhoto(user_id, photo_id);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+};
+

@@ -6,13 +6,15 @@ module.exports = (socket, io) => {
 
   const user = socket.user;
   if (!user?.user_id) return;
+  console.log(`Audio call socket initialized for user: ${user.user_id}`);
 
   const emitToUser = (uid, event, data) => {
+    console.log(`Emitting event '${event}' to user ${uid} with data:`, data);
     const sockets = socketMap.getSockets(uid);
     for (const sid of sockets) {
       io.to(sid).emit(event, data);
     }
-  };
+  };  
 
   // OFFER
   socket.on("audio_offer", ({ session_id, target_id, offer }) => {
