@@ -7,6 +7,7 @@ const {uploadMiddleware, processImage }=require("../middlewares/uploadMiddleware
 router.post("/:user_id", authenticateUser,uploadMiddleware,processImage, photoController.addPhoto)
 router.put("/:user_id/:photo_id",authenticateUser,uploadMiddleware,processImage, photoController.updatePhotoUrl)
 router.delete("/:user_id/:photo_id",authenticateUser, photoController.deletePhotoById)
+router.put("/:user_id/:photo_id/primary", authenticateUser, photoController.setPrimaryPhoto);
 
 // router.post("/:user_id", authenticateUser, photoController.addPhoto)
 // router.put("/:user_id/:photo_id",authenticateUser, photoController.updatePhotoUrl)

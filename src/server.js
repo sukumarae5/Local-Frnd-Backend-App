@@ -11,6 +11,8 @@ const userRoutes= require('./routes/userRoutes')
 const photoRoutes=require('./routes/photoRoutes')
 const profileRoutes=require('./routes/profileRoutes')
 const callRoutes= require('./routes/callRoutes')
+const languageRoutes= require('./routes/languageRoutes')
+const avatarRoutes = require("./routes/avatarRoutes");
 
 const app=express();
 
@@ -51,6 +53,8 @@ app.use('/api/user', userRoutes)
 app.use('/api/photo', photoRoutes)
 app.use('/api/userprofile',profileRoutes)
 app.use('/api/call', callRoutes)
+app.use('/api/language', languageRoutes)
+app.use("/api/avatars", avatarRoutes);
 
 app.use("/uploads", express.static("uploads"));
 

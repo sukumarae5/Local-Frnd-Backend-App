@@ -1,4 +1,3 @@
-// services/photoServices.js
 const photoModel = require("../models/photoModel");
 const userModel = require("../models/user");
 const { isProfileComplete } = require("./userServices")
@@ -27,29 +26,7 @@ const addPhoto = async (user_id, photo_url) => {
   const photo_id = await photoModel.addPhoto(user_id, photo_url, is_primary);
 
   const isFirstPhoto = count === 0;
-  const profileCompleted = await isProfileComplete(user_id);
-
   console.log("isFirstPhoto:", isFirstPhoto);
-  console.log("profileCompleted:", profileCompleted);
-
-  // Reward only for FIRST photo + completed profile
-  if (isFirstPhoto && profileCompleted) {
-    console.log("Rewarding 50 coins to user:", user_id);
-
-    await userModel.updateCoinBalance(user_id, 50);
-    await userModel.updateProfile(user_id, {
-      profile_status: "verified",
-      status: "active",
-    });
-
-    return {
-      success: true,
-      message: "Photo uploaded & profile verified — 50 LC rewarded!",
-      reward: 50,
-      photo_id,
-      status: "active",
-    };
-  }
 
   return {
     success: true,
@@ -120,6 +97,7 @@ const deletePhotoById = async (user_id, photo_id) => {
   if (photo.is_primary === 1) {
     const latest = await photoModel.getLatestPhoto(user_id);
     if (latest) {
+      await photoModel.clearPrimaryPhoto(user_id);
       await photoModel.setPrimaryPhoto(latest.photo_id, user_id);
     }
   }
@@ -127,10 +105,22 @@ const deletePhotoById = async (user_id, photo_id) => {
   return { success: true, message: "Photo deleted successfully" };
 };
 
+const setPrimaryPhoto = async (user_id, photo_id) => {
+  const photo = await photoModel.getPhotoById(photo_id, user_id);
+  if (!photo) throw new Error("Photo not found");
+  if (photo.status !== 'active') throw new Error("Cannot set inactive photo as primary"); 
+  await photoModel.clearPrimaryPhoto(user_id);
+
+  await photoModel.setPrimaryPhoto(photo_id, user_id);
+  return { success: true, message: "Primary photo updated successfully" };
+};
+
+
 module.exports = {
   getAllPhotos,
   getPhotosByUserId,
   addPhoto,
   updatePhotoUrl,
   deletePhotoById,
+  setPrimaryPhoto
 };

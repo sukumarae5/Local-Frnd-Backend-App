@@ -7,6 +7,7 @@ const {authenticateUser}=require("../middlewares/authMiddleware")
 router.put('/profile/:id',authenticateUser, userController.updateProfile);
 router.get("/profile/:id", authenticateUser, userController.getProfileById);
 router.delete("/profile/:id", authenticateUser,  userController.deleteUserId);
+router.patch("/profile", authenticateUser, userController.patchProfile);
 
 
 router.get("/random-users", authenticateUser, userController.getRandomUsers);

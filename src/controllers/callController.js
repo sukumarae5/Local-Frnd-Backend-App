@@ -1,7 +1,8 @@
 const { v4: uuidv4 } = require('uuid');
 const CallService = require('../services/callServices');
 const coinService = require('../services/coinService');
-const { getIO } = require('../socket');   
+const { getIO } = require('../socket');  
+const randomQueue = require('../utils/randomQueue'); 
 
 const getRateForType = (type) => {
   if (type === 'AUDIO') return coinService.RATES.AUDIO;
@@ -14,8 +15,10 @@ exports.initiate = async (req, res) => {
     const io = getIO();                    
 
     const caller_id = req.user.user_id;
+    console.log(req.body);
     const { type, target_user_id, mode } = req.body;
-    // mode: 'random' or 'direct' (if you want both). We'll support direct if target_user_id present.
+    console.log('Initiate call:', { caller_id, type, target_user_id, mode });
+    // mode: 'random' or 'direct' (if you want both). We'll support direct if tar   get_user_id present.
     if (!type || !['AUDIO', 'VIDEO'].includes(type)) return res.status(400).json({ error: 'type required: AUDIO|VIDEO' });
 
     const session_id = 'CALL_' + uuidv4();
@@ -102,7 +105,8 @@ exports.randomConnect = async (req, res) => {
     const io = getIO();
     const user_id = req.user.user_id;
     const { type = "AUDIO" } = req.body;
-
+    console.log(req.body);
+     console.log("randomConnect called by user:", user_id, "for type:", type);
     if (!['AUDIO', 'VIDEO'].includes(type)) {
       return res.status(400).json({ error: "Invalid type" });
     }
@@ -114,7 +118,7 @@ exports.randomConnect = async (req, res) => {
 
     // STEP 2: Try to get someone waiting
     const waitingUser = randomQueue.pop();
-
+    console.log("Waiting user found:", waitingUser);
     if (!waitingUser) {
       // nobody waiting → this user becomes WAITING
       randomQueue.add(user_id);
@@ -126,7 +130,7 @@ exports.randomConnect = async (req, res) => {
     const receiver_id = user_id;
 
     const session_id = "CALL_" + uuidv4();
-
+    console.log("Match found! Caller:", caller_id, "Receiver:", receiver_id, "Session ID:", session_id);
     // create searching session for caller
     await CallService.createSearching({
       session_id,

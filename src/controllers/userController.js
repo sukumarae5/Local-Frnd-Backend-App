@@ -36,6 +36,37 @@ exports.updateProfile = async (req, res) => {
   }
 };
 
+exports.patchProfile = async (req, res) => {
+  console.log('Patch profile request body:', req.body);
+  try {
+    const user_id = req.user.user_id; // from auth middleware
+    const updates = req.body;
+
+    if (!user_id) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized"
+      });
+    }
+
+    if (!updates || Object.keys(updates).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No fields provided to update"
+      });
+    }
+
+    const result = await profileService.patchProfile(user_id, updates);
+
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
 
 exports.deleteUserId = async (req, res) => {
   try {
