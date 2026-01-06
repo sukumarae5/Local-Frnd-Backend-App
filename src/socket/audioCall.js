@@ -1,87 +1,89 @@
-const CallService = require('../services/callServices');
-const coinService = require('../services/coinService');
-const socketMap = require('./socketMap');
+const CallService = require("../services/callServices");
+const coinService = require("../services/coinService");
+
+/**
+ * sessionId -> Set(userId)
+ */
+const joinedUsers = new Map();
+
+/**
+ * sessionId -> lastPing
+ */
+const heartbeats = new Map();
+
+/**
+ * sessions already connected
+ */
+const connectedSessions = new Set();
 
 module.exports = (socket, io) => {
+  const userId = String(socket.user.user_id);
 
-  const user = socket.user;
-  if (!user?.user_id) return;
-  console.log(`Audio call socket initialized for user: ${user.user_id}`);
+  /* ================= JOIN ================= */
+  socket.on("audio_join", async ({ session_id }) => {
+    const room = `call:${session_id}`;
+    socket.join(room);
 
-  const emitToUser = (uid, event, data) => {
-    console.log(`Emitting event '${event}' to user ${uid} with data:`, data);
-    const sockets = socketMap.getSockets(uid);
-    for (const sid of sockets) {
-      io.to(sid).emit(event, data);
+    if (!joinedUsers.has(session_id)) {
+      joinedUsers.set(session_id, new Set());
     }
-  };  
 
-  // OFFER
-  socket.on("audio_offer", ({ session_id, target_id, offer }) => {
-    emitToUser(target_id, "audio_offer", { session_id, from: user.user_id, offer });
-  });
+    // ⛔ Prevent duplicate join
+    if (joinedUsers.get(session_id).has(userId)) return;
 
-  // ANSWER
-  socket.on("audio_answer", ({ session_id, target_id, answer }) => {
-    emitToUser(target_id, "audio_answer", { session_id, from: user.user_id, answer });
-  });
+    joinedUsers.get(session_id).add(userId);
 
-  // ICE
-  socket.on("audio_ice_candidate", ({ session_id, target_id, candidate }) => {
-    emitToUser(target_id, "audio_ice_candidate", { session_id, from: user.user_id, candidate });
-  });
+    const roomSize = io.sockets.adapter.rooms.get(room)?.size || 0;
 
-  // ACCEPT
-  socket.on("audio_call_accept", async ({ session_id }) => {
-    try {
-      const session = await CallService.getSession(session_id);
-      if (!session) return socket.emit("error", { message: "session_not_found" });
+    console.log("📞 audio_join", { session_id, userId, roomSize });
 
-      if (session.type !== "AUDIO") return socket.emit("error", { message: "not_audio_call" });
+    // 🔥 Emit ONCE
+    if (roomSize === 2 && !connectedSessions.has(session_id)) {
+      connectedSessions.add(session_id);
 
-      await CallService.connectSession(session_id);
+      try {
+        await CallService.connectSession(session_id);
+      } catch (err) {
+        console.error("⚠️ connectSession:", err.message);
+      }
 
-      await coinService.startSessionBilling({
-        session_id,
-        caller_id: session.caller_id,
-        receiver_id: session.receiver_id,
-        type: "AUDIO",
-        coin_rate_per_min: coinService.RATES.AUDIO,
-      });
-
-      emitToUser(session.caller_id, "audio_call_connected", { session_id });
-      emitToUser(session.receiver_id, "audio_call_connected", { session_id });
-
-    } catch (err) {
-      console.error("audio_call_accept error", err);
+      io.to(room).emit("audio_connected");
     }
   });
 
-  // REJECT
-  socket.on("audio_call_reject", async ({ session_id }) => {
-    try {
-      await CallService.endSession(session_id);
-      const session = await CallService.getSession(session_id);
-      emitToUser(session?.caller_id, "audio_call_rejected", { session_id });
-    } catch (err) {
-      console.error("audio_call_reject error", err);
-    }
+  /* ================= HEARTBEAT ================= */
+  socket.on("audio_ping", ({ session_id }) => {
+    heartbeats.set(session_id, Date.now());
   });
 
-  // HANGUP
+  /* ================= SIGNALING ================= */
+  socket.on("audio_offer", ({ session_id, offer }) => {
+    socket.to(`call:${session_id}`).emit("audio_offer", { offer });
+  });
+
+  socket.on("audio_answer", ({ session_id, answer }) => {
+    socket.to(`call:${session_id}`).emit("audio_answer", { answer });
+  });
+
+  socket.on("audio_ice_candidate", ({ session_id, candidate }) => {
+    socket.to(`call:${session_id}`).emit("audio_ice_candidate", { candidate });
+  });
+
+  /* ================= HANGUP ================= */
   socket.on("audio_call_hangup", async ({ session_id }) => {
+    console.log("📴 audio_call_hangup", session_id);
+
     try {
-      const session = await CallService.getSession(session_id);
-      if (!session) return;
-
       await CallService.endSession(session_id);
-      const result = await coinService.finalizeOnHangup(session_id);
-
-      emitToUser(session.caller_id, "audio_call_ended", { session_id, reason: "HANGUP", result });
-      emitToUser(session.receiver_id, "audio_call_ended", { session_id, reason: "HANGUP", result });
-
+      await coinService.finalizeOnHangup(session_id);
     } catch (err) {
-      console.error("audio_call_hangup error", err);
+      console.error("❌ hangup error:", err.message);
     }
+
+    io.to(`call:${session_id}`).emit("audio_call_ended");
+
+    joinedUsers.delete(session_id);
+    heartbeats.delete(session_id);
+    connectedSessions.delete(session_id);
   });
 };

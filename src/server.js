@@ -73,7 +73,9 @@ const server= app.listen(port,"0.0.0.0",()=>{
     
 const io = socketIO(server, {
     cors: {
-      origin: "*",                       
+      origin: "*",  
+             methods: ["GET", "POST"],
+                  
     },
 });     
 

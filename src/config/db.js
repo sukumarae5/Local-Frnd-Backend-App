@@ -11,9 +11,25 @@ const connection=mysql.createPool({
      ca:fs.readFileSync(process.env.CA) 
     },
     waitForConnections:true,
-    connectionLimit:0,
-    queueLimit:0
+    connectionLimit:20,
+    queueLimit:0,
+    enableKeepAlive: true,
+  keepAliveInitialDelay: 0,
 })
+
+async function keepDbAlive() {
+  try {
+    const conn = await connection.getConnection();
+    await conn.ping();
+    conn.release();
+    console.log("🟢 MySQL keep-alive OK");
+  } catch (err) {
+    console.error("🔴 MySQL keep-alive FAILED:", err.message);
+  }
+}
+
+// ping every 60 seconds
+setInterval(keepDbAlive, 60_000);
 
 const conn = async()=>{
     try {

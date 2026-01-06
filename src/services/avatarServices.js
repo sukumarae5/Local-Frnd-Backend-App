@@ -1,5 +1,4 @@
 const avatarModel = require("../models/avatarModel");
-const userModel = require("../models/user");
 
 const addAvatar = async ({  gender, image_url, sort_order }) => {
   console.log(gender, image_url, sort_order);

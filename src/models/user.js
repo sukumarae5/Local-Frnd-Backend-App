@@ -17,6 +17,31 @@ const createUserIfNotExist = async (mobile_number) => {
   return result;
 };
 
+const markOnline = async (user_id) => {
+  await db.execute(
+    `
+    UPDATE user
+    SET is_online = 1,
+        last_seen = NOW()
+    WHERE user_id = ?
+    `,
+    [user_id]
+  );
+};
+
+const markOffline = async (user_id) => {
+  await db.execute(
+    `
+    UPDATE user
+    SET is_online = 0,
+        last_seen = NOW()
+    WHERE user_id = ?
+    `,
+    [user_id]
+  );
+};
+
+
 const findByMobileAndOtp= async (mobile_number, otp) => {
     const [rows] =await db.execute('SELECT * from user WHERE mobile_number=? AND otp=?',
         [mobile_number, otp]
@@ -109,7 +134,7 @@ const getProfileById=async (user_id) => {
     SELECT user_id, name, username, mobile_number, email, age, date_of_birth,
            gender, bio, profile_status, status, coin_balance, location_lat,
            location_log, is_online, last_seen
-    FROM users
+    FROM user
     WHERE user_id = ?
     `,
     [user_id]
@@ -142,12 +167,167 @@ const getRandomOnlineUser = async (currentUserId) => {
   return rows[0] || null;
 };
 
+const getRandomOnlineOppositeGenderUser = async (currentUserId) => {
+  const [[me]] = await db.execute(
+    `SELECT gender FROM user WHERE user_id=?`,
+    [currentUserId]
+  );
+
+  if (!me || !me.gender) return null;
+
+  const targetGender = me.gender === "Male" ? "Female" : "Male";
+
+  const [rows] = await db.execute(
+    `
+    SELECT user_id, name
+    FROM user
+    WHERE user_id != ?
+      AND is_online = 1
+      AND gender = ?
+      AND status = 'active'
+    ORDER BY RAND()
+    LIMIT 1
+    `,
+    [currentUserId, targetGender]
+  );
+
+  return rows[0] || null;
+};
+
+const getNearestOnlineFemale = async (userId) => {
+  const [[me]] = await db.execute(
+    `SELECT location_lat, location_log FROM user WHERE user_id=?`,
+    [userId]
+  );
+
+  if (!me?.location_lat || !me?.location_log) return null;
+
+  const [rows] = await db.execute(
+    `
+    SELECT user_id, name,
+    (
+      6371 * acos(
+        cos(radians(?)) *
+        cos(radians(location_lat)) *
+        cos(radians(location_log) - radians(?)) +
+        sin(radians(?)) *
+        sin(radians(location_lat))
+      )
+    ) AS distance
+    FROM user
+    WHERE gender = 'Female'
+      AND is_online = 1
+      AND status = 'active'
+      AND location_lat IS NOT NULL
+      AND location_log IS NOT NULL
+    HAVING distance < 50
+    ORDER BY distance
+    LIMIT 1
+    `,
+    [me.location_lat, me.location_log, me.location_lat]
+  );
+
+  return rows[0] || null;
+};
+
+
+const rewardProfileVerification = async (user_id) => {
+  const conn = await db.getConnection();
+  console.log("Rewarding profile verification for user_id:", user_id);
+  try {
+    await conn.beginTransaction();
+
+    const [[user]] = await conn.execute(
+      `SELECT gender, profile_status, avatar_id FROM user WHERE user_id=? FOR UPDATE`,
+      [user_id]
+    );
+
+    if (!user || user.profile_status === "verified" || !user.avatar_id) {
+      await conn.rollback();
+      return false;
+    }
+
+    const reward = user.gender === "Female" ? 20 : 50;
+
+    await conn.execute(
+      `
+      UPDATE user
+      SET coin_balance = coin_balance + ?,
+          profile_status = 'verified',
+          status = 'active'
+      WHERE user_id=?
+      `,
+      [reward, user_id]
+    );
+
+    await conn.commit();
+    return reward;
+  } catch (e) {
+    await conn.rollback();
+    throw e;
+  } finally {
+    conn.release();
+  }
+};
+
+const getNearestOnlineFemaleForMale = async (maleUserId, radiusKm = 50) => {
+  // Get male location
+  const [[male]] = await db.execute(
+    `SELECT location_lat, location_log, gender
+     FROM user
+     WHERE user_id = ?`,
+    [maleUserId]
+  );
+
+  if (!male || male.gender !== "Male") return null;
+  if (male.location_lat === null || male.location_log === null) return null;
+
+  const [rows] = await db.execute(
+    `
+    SELECT 
+      user_id,
+      name,
+      location_lat,
+      location_log,
+      (
+        6371 * acos(
+          cos(radians(?)) *
+          cos(radians(location_lat)) *
+          cos(radians(location_log) - radians(?)) +
+          sin(radians(?)) *
+          sin(radians(location_lat))
+        )
+      ) AS distance
+    FROM user
+    WHERE gender = 'Female'
+      AND is_online = 1
+      AND status = 'active'
+      AND location_lat IS NOT NULL
+      AND location_log IS NOT NULL
+    HAVING distance <= ?
+    ORDER BY distance ASC
+    LIMIT 1
+    `,
+    [
+      male.location_lat,
+      male.location_log,
+      male.location_lat,
+      radiusKm
+    ]
+  );
+
+  return rows[0] || null;
+};
 
 module.exports={
     createUserIfNotExist,
     findByMobile,
+    rewardProfileVerification,
+    getNearestOnlineFemaleForMale,
     findByMobileAndOtp,
+    getRandomOnlineOppositeGenderUser,
     createOrUpdateOtp,
+    getNearestOnlineFemale,
     clearOtp,
     findById,
     updateProfile,
@@ -157,5 +337,7 @@ module.exports={
     getRandomUsers,
     getProfileById,
     isUserOnline,
+    markOffline,
+    markOnline,
     getRandomOnlineUser
 }

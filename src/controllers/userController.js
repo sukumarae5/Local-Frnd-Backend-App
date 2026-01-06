@@ -8,8 +8,8 @@ exports.getAllUsers = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
-      
-exports.getProfileById = async (req, res) => { 
+
+exports.getProfileById = async (req, res) => {
   try {
     const { id } = req.params;
     const result = await profileService.getProfileById(id);
@@ -17,27 +17,28 @@ exports.getProfileById = async (req, res) => {
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
-};    
-
+};
 
 exports.updateProfile = async (req, res) => {
   try {
-    const user_id  = req.params.id;
+    const user_id = req.params.id;
     const userData = req.body;
-    console.log(req.body)
-    console.log(req.params.id)
+    console.log(req.body);
+    console.log(req.params.id);
     if (!user_id)
-      return res.status(400).json({ success: false, message: "user id is required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "user id is required" });
 
     const result = await profileService.updateProfile(user_id, userData);
-    res.json({ success: true, message: "Profile updated", result });
+    res.json(result);
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
 exports.patchProfile = async (req, res) => {
-  console.log('Patch profile request body:', req.body);
+  console.log("Patch profile request body:", req.body);
   try {
     const user_id = req.user.user_id; // from auth middleware
     const updates = req.body;
@@ -45,14 +46,14 @@ exports.patchProfile = async (req, res) => {
     if (!user_id) {
       return res.status(401).json({
         success: false,
-        message: "Unauthorized"
+        message: "Unauthorized",
       });
     }
 
     if (!updates || Object.keys(updates).length === 0) {
       return res.status(400).json({
         success: false,
-        message: "No fields provided to update"
+        message: "No fields provided to update",
       });
     }
 
@@ -62,18 +63,19 @@ exports.patchProfile = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
-
 
 exports.deleteUserId = async (req, res) => {
   try {
     const { id } = req.params;
 
     if (!id) {
-      return res.status(400).json({ success: false, message: "User ID is required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "User ID is required" });
     }
 
     const result = await profileService.deleteUserId(id);
@@ -85,7 +87,7 @@ exports.deleteUserId = async (req, res) => {
 
 exports.getRandomUsers = async (req, res) => {
   try {
-    const currentUserId = req.user.user_id; 
+    const currentUserId = req.user.user_id;
 
     const result = await profileService.getRandomUsers(currentUserId);
 
@@ -113,4 +115,35 @@ exports.connectUser = async (req, res) => {
   );
 
   res.json(result);
+};
+
+exports.connectRandomOppositeGender = async (req, res) => {
+  const currentUserId = req.user.user_id;
+  const result = await profileService.connectRandomUserOppositeGender(
+    currentUserId
+  );
+  res.json(result);
+};
+
+exports.nearbyForMale = async (req, res) => {
+  const userId = req.user.user_id;
+  const result = await userService.connectNearbyForMale(userId);
+  res.json(result);
+};
+
+
+exports.connectNearestFemale = async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+
+    const result = await userService.connectMaleToNearestFemale(userId);
+
+    return res.json(result);
+  } catch (err) {
+    console.error("connectNearestFemale error", err);
+    res.status(500).json({
+      success: false,
+      message: "Server error"
+    });
+  }
 };

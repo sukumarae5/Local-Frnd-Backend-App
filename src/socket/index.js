@@ -1,7 +1,7 @@
-const authSocketMiddleware = require('../middlewares/authSocketMiddleware');
-const presenceHandler = require('./presence');
-const callSocket = require('./callSocket');
-const socketMap = require('./socketMap');
+const authSocketMiddleware = require("../middlewares/authSocketMiddleware");
+const presenceHandler = require("./presence");
+const callSocket = require("./callSocket");
+const socketMap = require("./socketMap");
 
 let ioInstance = null;
 
@@ -12,28 +12,39 @@ function init(io) {
 
   io.on("connection", (socket) => {
     const user = socket.user;
-    if (!user?.user_id) return socket.disconnect(true);
+    if (!user?.user_id) {
+      socket.disconnect(true);
+      return;
+    }
 
-    console.log("Socket connected:", user.user_id, socket.id);
-    presenceHandler(io, socket);
+    const userId = String(user.user_id);
+    console.log("🔗 Socket connected:", userId, socket.id);
+
+    const wasOffline = !socketMap.isOnline(userId);
+
+    socketMap.addSocket(userId, socket.id);
+    socket.join(userId); // 🔥 USER ROOM
+
+    if (wasOffline) {
+      presenceHandler(io, userId, "online"); // non-blocking
+    }
+
     callSocket(socket, io);
 
     socket.on("disconnect", () => {
-      console.log("Socket disconnected:", user.user_id, socket.id);
-      
+      console.log("⚠️ Socket disconnected:", userId, socket.id);
+
+      const fullyOffline = socketMap.removeSocket(userId, socket.id);
+      if (fullyOffline) {
+        presenceHandler(io, userId, "offline");
+      }
     });
   });
-
-  return io;
 }
 
 function getIO() {
-  if (!ioInstance) {
-    throw new Error("Socket.IO not initialized yet!");
-  }
+  if (!ioInstance) throw new Error("Socket.IO not initialized");
   return ioInstance;
 }
-
-
 
 module.exports = { init, getIO };

@@ -9,11 +9,11 @@ export const generateToken = (user) => {
 
     const token = jwt.sign(payload, process.env.JWT_SECRET, {
       expiresIn: "4h",
-    });
+    });              
 
     return token;
   } catch (err) {
     console.error("Error generating token:", err);
     return null;
-  }
+  }   
 };

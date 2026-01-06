@@ -49,6 +49,18 @@ const updateReceiverBalance= async (session_id, receiver_balance)=>{
   await db.execute(sql, [receiver_balance, session_id]);
 }
 
+const findActiveByUser = async (user_id) => {
+  const [rows] = await db.execute(
+    `SELECT * FROM call_sessions 
+     WHERE status='CONNECTED' 
+     AND (caller_id=? OR receiver_id=?) 
+     LIMIT 1`,
+    [user_id, user_id]
+  );
+  return rows[0];
+};
+
+
 module.exports={
     createInitialSession,
     setMatchedSession,
@@ -57,5 +69,6 @@ module.exports={
     getSessionById,
     setInitialBalances,
     updateCallerBalance,
-    updateReceiverBalance
+    updateReceiverBalance,
+    findActiveByUser
 }
