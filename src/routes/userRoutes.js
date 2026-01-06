@@ -13,6 +13,21 @@ router.patch("/profile", authenticateUser, userController.patchProfile);
 router.get("/random-users", authenticateUser, userController.getRandomUsers);
 router.get("/connect/random", authenticateUser, userController.connectRandom);
 router.post("/connect/user", authenticateUser, userController.connectUser);
+router.get(
+  "/connect/random-opposite",
+  authenticateUser,
+  userController.connectRandomOppositeGender
+);
+router.get(
+  "/connect/nearby-female",
+  authenticateUser,
+  userController.nearbyForMale
+);
+router.get(
+  "/connect/nearest-female",
+  authenticateUser,
+  userController.connectNearestFemale
+);
 
 
 router.put('/admin/profile/:id', userController.updateProfile);

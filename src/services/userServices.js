@@ -14,9 +14,10 @@ const bannedWords = [
 ];
 
 const containsProfanity = (text) => {
-  const lower = text.toLowerCase();
-  return bannedWords.some((word) => lower.includes(word));
+  const cleaned = text.toLowerCase().replace(/[^a-z]/g, "");
+  return bannedWords.some(word => cleaned.includes(word));
 };
+
 
 const getAllUsers = async () => {
   const users = await userModel.getAllUsers();
@@ -29,12 +30,6 @@ const getProfileById = async (id) => {
   return { success: true, user };
 };
 
-const hasVisualIdentity = async (user) => {
-  if (user.avatar_id) return true;
-
-  const primaryPhoto = await photoModel.findPrimaryByUserId(user.user_id);
-  return Boolean(primaryPhoto);
-};
 
 const isProfileComplete = async (user_id) => {
   const user = await userModel.findById(user_id);
@@ -42,7 +37,7 @@ const isProfileComplete = async (user_id) => {
   return Boolean(
    
       user.mobile_number &&
-      user.age &&
+      user.date_of_birth &&
       user.gender &&
       user.language_id &&
       user.location_lat &&
@@ -153,7 +148,7 @@ const patchProfile = async (user_id, data) => {
 const isComplete = await isProfileComplete(user_id);
   const hasAvatar = Boolean(updatedUser.avatar_id);
 
-  
+  console.log("isComplete:", isComplete, "hasAvatar:", hasAvatar);
 
   if (isComplete && !hasAvatar) {
     return {
@@ -164,20 +159,23 @@ const isComplete = await isProfileComplete(user_id);
     };
   }
    
-   if (isComplete && hasAvatar) {
-    await userModel.updateCoinBalance(user_id, 50);
-
-    await userModel.updateProfile(user_id, {
-      profile_status: "verified",
-      status: "active",
-    });
-
+if (isComplete && hasAvatar) {
+  const rewarded = await userModel.rewardProfileVerification(user_id);
+console.log("Rewarded:", rewarded);
+  if (rewarded) {
     return {
       success: true,
       message: "Profile verified successfully",
-      reward: 50,
+      reward: 50
     };
   }
+
+  return {
+    success: true,
+    message: "Profile already verified"
+  };
+}
+
 
   return {
     success: true,
@@ -190,8 +188,10 @@ const updateProfile = async (user_id, data) => {
   if (!user) throw new Error("User not found");
 
   const required = ["date_of_birth", "gender","language_id", "location_lat", "location_log"];
-  const missing = required.filter(field => !data[field]);
-  
+  const missing = required.filter(
+  field => data[field] === undefined || data[field] === null
+);
+
   if (missing.length) {
     return {
       success: false,
@@ -269,22 +269,22 @@ const updateProfile = async (user_id, data) => {
     };
   }
 
-   if (isComplete && hasAvatar) {
-    await userModel.updateCoinBalance(user_id, 50);
-
-    await userModel.updateProfile(user_id, {
-      profile_status: "verified",
-      status: "active",
-    });
-
+ if (isComplete && hasAvatar) {
+  const rewarded = await userModel.rewardProfileVerification(user_id);
+ console.log("Rewarded:", rewarded);
+  if (rewarded) {
     return {
       success: true,
-      message: "Profile verified — 50 coins rewarded!",
-      reward: 50,
+      message: "Profile verified successfully",
+      reward: 50
     };
   }
 
-
+  return {
+    success: true,
+    message: "Profile already verified"
+  };
+}
   return { success: true, message: "Profile updated successfully" };
 };
 
@@ -342,7 +342,57 @@ const connectToSpecificUser = async (currentUserId, targetUserId) => {
   };
 };
 
+const connectRandomUserOppositeGender = async (currentUserId) => {
+  const user = await userModel.getRandomOnlineOppositeGenderUser(currentUserId);  
+  if (!user) {
+    return { success: false, message: "No online users of opposite gender available" };
+  }
 
+  return {
+    success: true,
+    message: "User found",
+    user,
+  };
+}
+
+const connectNearbyForMale = async (userId) => {
+  const [[me]] = await db.execute(
+    `SELECT gender FROM user WHERE user_id=?`,
+    [userId]
+  );
+
+  if (me.gender !== "Male") {
+    return { success: false, message: "Only males allowed" };
+  }
+
+  const user = await userModel.getNearestOnlineFemale(userId);
+
+  if (!user) {
+    return { success: false, message: "No nearby females online" };
+  }
+
+  return { success: true, user };
+};
+
+const connectMaleToNearestFemale = async (userId) => {
+  const user = await userModel.getNearestOnlineFemaleForMale(userId);
+
+  if (!user) {
+    return {
+      success: false,
+      message: "No nearby females online"
+    };
+  }
+
+  return {
+    success: true,
+    user: {
+      user_id: user.user_id,
+      name: user.name,
+      distance_km: Number(user.distance.toFixed(2))
+    }
+  };
+};
 
 module.exports = {
   getAllUsers,
@@ -353,5 +403,8 @@ module.exports = {
   deleteUserId,
   getRandomUsers,
   connectRandomUser,
-  connectToSpecificUser
+  connectToSpecificUser,
+  connectRandomUserOppositeGender,
+  connectMaleToNearestFemale,
+  connectNearbyForMale
 };

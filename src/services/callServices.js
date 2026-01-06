@@ -13,9 +13,15 @@ const connectSession= async (session_id) => {
     return await callModel.markConnected( session_id );
 }
 
+
 const endSession= async (session_id) => {
     return await callModel.markEnded( session_id );
 }
+
+const findActiveByUser = async (user_id) => {
+  return await callModel.findActiveByUser(user_id);
+};
+
 
 const getSession= async (session_id) => {
     return await callModel.getSessionById( session_id );
@@ -76,6 +82,7 @@ module.exports={
     createSearching,
     matchToReceiver,
     connectSession,
+    findActiveByUser,
     endSession,
     getSession,
     setInitialBalances,

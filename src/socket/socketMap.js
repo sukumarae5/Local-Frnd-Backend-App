@@ -1,10 +1,8 @@
-// userSocketMap.js
-const userSockets = new Map(); 
-// Structure:
-// userSockets: {
-//   "userId": Set(["socket1", "socket2"])
-// }
+const userSockets = new Map();
 
+/* =========================
+   ADD SOCKET
+========================= */
 function addSocket(userId, socketId) {
   userId = String(userId);
 
@@ -15,39 +13,77 @@ function addSocket(userId, socketId) {
   userSockets.get(userId).add(socketId);
 }
 
+/* =========================
+   REMOVE SOCKET
+   returns: { userOffline: boolean }
+========================= */
 function removeSocket(userId, socketId) {
   userId = String(userId);
+
   if (!userSockets.has(userId)) return false;
 
   const sockets = userSockets.get(userId);
   sockets.delete(socketId);
 
-  // If no sockets left → user fully offline
   if (sockets.size === 0) {
     userSockets.delete(userId);
-    return true; // means user is now offline
+    return true; // user fully offline
   }
 
-  return false; 
+  return false;
 }
 
+/* =========================
+   GET SOCKET IDS
+========================= */
 function getSockets(userId) {
-  userId = String(userId);
-  return userSockets.get(userId) || new Set();
+  return userSockets.get(String(userId)) || new Set();
 }
 
+function getAnySocket(userId) {
+  const sockets = getSockets(userId);
+  return sockets.size ? [...sockets][0] : null;
+}
+
+/* =========================
+   ONLINE STATUS
+========================= */
 function isOnline(userId) {
   return userSockets.has(String(userId));
 }
 
-function all() {
-  return userSockets;
+/* =========================
+   SAFE SNAPSHOT (READ ONLY)
+========================= */
+function snapshot() {
+  const data = {};
+  for (const [uid, sockets] of userSockets.entries()) {
+    data[uid] = [...sockets];
+  }
+  return data;
+}
+
+/* =========================
+   COUNTS (DEBUG)
+========================= */
+function count() {
+  let socketCount = 0;
+  for (const sockets of userSockets.values()) {
+    socketCount += sockets.size;
+  }
+
+  return {
+    users: userSockets.size,
+    sockets: socketCount,
+  };
 }
 
 module.exports = {
   addSocket,
   removeSocket,
   getSockets,
+  getAnySocket,
   isOnline,
-  all
+  snapshot,
+  count,
 };

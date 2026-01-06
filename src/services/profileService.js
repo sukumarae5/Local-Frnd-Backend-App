@@ -72,7 +72,6 @@ exports.getUserProfile = async (userId) => {
     profile_image = primary_image.photo_url;
   }
 
-
   return { user, profile_image, primary_image, gallery_images };
 };
 
