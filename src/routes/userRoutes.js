@@ -29,6 +29,12 @@ router.get(
   userController.connectNearestFemale
 );
 
+router.get(
+  "/browse/random-females",
+  authenticateUser,
+  userController.browseRandomFemales
+);
+
 
 router.put('/admin/profile/:id', userController.updateProfile);
 // router.get("/admin/profile/:id", userController.getProfileById)    

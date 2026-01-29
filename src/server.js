@@ -13,6 +13,14 @@ const profileRoutes=require('./routes/profileRoutes')
 const callRoutes= require('./routes/callRoutes')
 const languageRoutes= require('./routes/languageRoutes')
 const avatarRoutes = require("./routes/avatarRoutes");
+const callHistoryRoutes = require("./routes/callHistoryRoutes");
+const friendRoutes = require("./routes/friendRoutes");
+const locationRoutes = require("./routes/locationRoutes");
+const interestRoutes = require("./routes/interestRoutes");
+const userinterestRoutes = require("./routes/userinterestRoutes");
+const lifestyleRoutes = require("./routes/lifestyleRoutes");
+const lifestylecategoryRoutes = require("./routes/lifestylecategoryRoutes");
+const userlifestyleRoutes = require("./routes/userlifestyleRoutes");
 
 const app=express();
 
@@ -30,6 +38,8 @@ app.get("/api/user",(req, res)=>{
     console.log("user route")
     res.send("user route")
 })
+
+
 // app.post("/api/singlephoto", upload.single('photo'),(req,res)=>{
 //     console.log("photo uploaded")
 //     console.log(req.file.originalname)
@@ -55,6 +65,15 @@ app.use('/api/userprofile',profileRoutes)
 app.use('/api/call', callRoutes)
 app.use('/api/language', languageRoutes)
 app.use("/api/avatars", avatarRoutes);
+app.use("/api/calls", callHistoryRoutes);
+app.use("/api/friend", friendRoutes);
+app.use("/api/location", locationRoutes);
+app.use("/api/interest", interestRoutes);
+app.use("/api/userinterest", userinterestRoutes);
+app.use('/api/lifestyle',lifestyleRoutes);
+app.use('/api/lifestylecategory',lifestylecategoryRoutes);
+app.use('/api/userlifestyle', userlifestyleRoutes);
+
 
 app.use("/uploads", express.static("uploads"));
 

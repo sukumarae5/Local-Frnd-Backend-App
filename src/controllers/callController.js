@@ -16,11 +16,12 @@ exports.initiate = async (req, res) => {
   try {
     const io = getIO();
     const caller_id = req.user.user_id;
-    const { target_user_id, type } = req.body;
+const { target_user_id, call_type, type } = req.body;
+const finalType = call_type || type;
 
-    if (!target_user_id || !type) {
-      return res.status(400).json({ error: "Missing data" });
-    }
+if (!target_user_id || !finalType) {
+  return res.status(400).json({ error: "Missing data" });
+}
 
     const caller = await userModel.findById(caller_id);
     const target = await userModel.findById(target_user_id);
@@ -29,7 +30,7 @@ exports.initiate = async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // 🔒 Gender rule
+    
     if (caller.gender !== "Male" || target.gender !== "Female") {
       return res.status(403).json({
         error: "Only Male can call Female",
@@ -37,27 +38,24 @@ exports.initiate = async (req, res) => {
     }
 
     const session_id = "CALL_" + uuidv4();
-    const rate = getRate(type);
+    const rate = getRate(finalType);
 
-    // 1️⃣ Create session → SEARCHING
     await CallService.createSearching({
       session_id,
       caller_id,
-      type,
+      type: finalType,
       coin_rate_per_min: rate,
     });
 
-    // 2️⃣ Match receiver → RINGING
+    
     await CallService.matchToReceiver(session_id, target_user_id);
 
-    // 3️⃣ Notify receiver
     io.to(String(target_user_id)).emit("incoming_call", {
       session_id,
       from: caller_id,
-      type,
+call_type: finalType,
     });
 
-    // ✅ IMPORTANT: return RINGING
     return res.json({
       status: "RINGING",
       session_id,
@@ -68,26 +66,22 @@ exports.initiate = async (req, res) => {
   }
 };
 
-/* ======================================================
-   🔹 RANDOM CALL (Gender Based)
-====================================================== */
+
 exports.randomConnect = async (req, res) => {
   const io = getIO();
 
   const user_id = String(req.user.user_id);
   const gender = req.body.gender;
-  const { type = "AUDIO" } = req.body;
-
+const { call_type, type } = req.body;
+const finalType = call_type || type || "AUDIO";
   console.log("\n📥 BE ← /random-connect", {
     user_id,
     gender,
-    type,
+    finalType,
   });
 
-  /* ================= FIND OPPOSITE ================= */
   const peer_id = randomQueue.popOpposite(gender);
 
-  /* ---------- NO PEER ---------- */
   if (!peer_id) {
     randomQueue.add(user_id, gender);
 
@@ -114,12 +108,13 @@ exports.randomConnect = async (req, res) => {
   randomQueue.remove(peer_id);
 
   /* ================= DB ================= */
-  await CallService.createSearching({
-    session_id,
-    caller_id: gender === "Male" ? user_id : peer_id,
-    type,
-    coin_rate_per_min: getRate(type),
-  });
+ await CallService.createSearching({
+  session_id,
+  caller_id: gender === "Male" ? user_id : peer_id,
+  type: finalType, // ✅ USE finalType
+  coin_rate_per_min: getRate(finalType),
+});
+
 
   await CallService.matchToReceiver(
     session_id,
@@ -131,12 +126,14 @@ exports.randomConnect = async (req, res) => {
     session_id,
     role: gender === "Male" ? "caller" : "receiver",
     peer_id,
+    call_type: finalType,
   });
 
   io.to(peer_id).emit("call_matched", {
     session_id,
     role: gender === "Male" ? "receiver" : "caller",
     peer_id: user_id,
+    call_type: finalType,
   });
 
   console.log("📞 BE MATCH COMPLETE", {
@@ -218,6 +215,7 @@ exports.hangup = async (req, res) => {
     if (!session_id) {
       return res.status(400).json({ error: "session_id required" });
     }
+    coinService.stopLiveBilling(session_id);
 
     await CallService.endSession(session_id);
     await coinService.finalizeOnHangup(session_id);

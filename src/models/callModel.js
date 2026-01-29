@@ -60,6 +60,21 @@ const findActiveByUser = async (user_id) => {
   return rows[0];
 };
 
+const findSearchingByUser = async (user_id) => {
+  const [rows] = await db.execute(
+    `
+    SELECT *
+    FROM call_sessions
+    WHERE caller_id = ?
+      AND status = 'SEARCHING'
+    ORDER BY created_at DESC
+    LIMIT 1
+    `,
+    [user_id]
+  );
+  return rows[0] || null;
+};
+
 
 module.exports={
     createInitialSession,
@@ -70,5 +85,6 @@ module.exports={
     setInitialBalances,
     updateCallerBalance,
     updateReceiverBalance,
-    findActiveByUser
+    findActiveByUser,
+    findSearchingByUser
 }

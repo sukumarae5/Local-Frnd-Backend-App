@@ -2,6 +2,7 @@ const authSocketMiddleware = require("../middlewares/authSocketMiddleware");
 const presenceHandler = require("./presence");
 const callSocket = require("./callSocket");
 const socketMap = require("./socketMap");
+const notification = require("./notification");
 
 let ioInstance = null;
 
@@ -30,6 +31,7 @@ function init(io) {
     }
 
     callSocket(socket, io);
+    notification(socket, io);
 
     socket.on("disconnect", () => {
       console.log("⚠️ Socket disconnected:", userId, socket.id);
