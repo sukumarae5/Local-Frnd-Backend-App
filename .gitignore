@@ -4,3 +4,5 @@ node_modules/
 #Environment variables
 .env
 *.json
+cities.json
+states.json
