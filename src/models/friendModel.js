@@ -31,22 +31,65 @@ const create = async (from, to) => {
 
 
 const accept = async (id, userId) => {
-  const [rows] = await db.execute(
-    `SELECT requested_by 
-     FROM friends
-     WHERE id=? AND status='PENDING'
-       AND requested_by != ?`,
-    [id, userId]
-  );
 
-  if (!rows.length) return null;
+  const conn = await db.getConnection();
 
-  await db.execute(
-    `UPDATE friends SET status='ACCEPTED', updated_at=NOW() WHERE id=?`,
-    [id]
-  );
+  try {
 
-  return rows[0].requested_by; // sender
+    await conn.beginTransaction();
+
+    const [rows] = await conn.execute(
+      `
+      SELECT user_id_1, user_id_2, requested_by
+      FROM friends
+      WHERE id=? AND status='PENDING'
+        AND requested_by != ?
+      FOR UPDATE
+      `,
+      [id, userId]
+    );
+
+    if (!rows.length) {
+      await conn.rollback();
+      return null;
+    }
+
+    const { user_id_1, user_id_2, requested_by } = rows[0];
+
+    await conn.execute(
+      `
+      UPDATE friends
+      SET status='ACCEPTED', updated_at=NOW()
+      WHERE id=?
+      `,
+      [id]
+    );
+
+    // normalize
+    const u1 = Math.min(user_id_1, user_id_2);
+    const u2 = Math.max(user_id_1, user_id_2);
+
+    // create conversation immediately
+    await conn.execute(
+      `
+      INSERT IGNORE INTO conversations (user1_id, user2_id)
+      VALUES (?, ?)
+      `,
+      [u1, u2]
+    );
+
+    await conn.commit();
+
+    return requested_by;
+
+  } catch (e) {
+
+    await conn.rollback();
+    throw e;
+
+  } finally {
+    conn.release();
+  }
 };
 
 /* ================= FRIEND LIST ================= */

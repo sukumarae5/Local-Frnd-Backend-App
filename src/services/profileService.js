@@ -34,6 +34,16 @@ exports.getUserProfile = async (userId) => {
   av.avatar_id,
   av.image_url AS avatar_url,
 
+  -- language
+lang.id           AS language_id,
+lang.code         AS language_code,
+lang.name_en      AS language_name_en,
+lang.native_name  AS language_native_name,
+lang.direction    AS language_direction,
+lang.is_active    AS language_is_active,
+lang.created_at   AS language_created_at,
+lang.updated_at   AS language_updated_at,
+
   -- photos
   pp.photo_id,
   pp.photo_url,
@@ -44,8 +54,13 @@ exports.getUserProfile = async (userId) => {
   i.name AS interest_name,
 
   -- lifestyles
-  l.id AS lifestyle_id,
-  l.name AS lifestyle_name
+  -- lifestyles
+lc.id   AS lifestyle_category_id,
+lc.name AS lifestyle_category_name,
+
+l.id    AS lifestyle_subcategory_id,
+l.name  AS lifestyle_subcategory_name
+
 
 FROM user u
 
@@ -60,8 +75,17 @@ LEFT JOIN profile_photo pp
 LEFT JOIN user_interests ui ON ui.user_id = u.user_id
 LEFT JOIN interests i ON i.id = ui.interest_id
 
-LEFT JOIN user_lifestyles ul ON ul.user_id = u.user_id
-LEFT JOIN lifestyles l ON l.id = ul.lifestyle_id
+LEFT JOIN user_lifestyles ul 
+       ON ul.user_id = u.user_id
+
+LEFT JOIN lifestyles l 
+       ON l.id = ul.lifestyle_id
+
+LEFT JOIN lifestyle_categories lc 
+       ON lc.id = l.category_id
+
+LEFT JOIN languages lang 
+  ON lang.id = u.language_id
 
 WHERE u.user_id = ?;
 
@@ -126,8 +150,25 @@ WHERE u.user_id = ?;
   const images = {
     avatar: first.avatar_url,
     profile_image,
-    gallery: photos.filter(p => p.is_primary === 0).map(p => p.url)
+    gallery: photos.filter(p => p.is_primary === 0).map(p => ({
+      photo_id: p.id,
+      photo_url: p.url
+    }))
   };
+
+  // 🌐 LANGUAGE
+const language = first.language_id
+  ? {
+      id: first.language_id,
+      code: first.language_code,
+      name_en: first.language_name_en,
+      native_name: first.language_native_name,
+      direction: first.language_direction,
+      is_active: first.language_is_active,
+      created_at: first.language_created_at,
+      updated_at: first.language_updated_at
+    }
+  : null;
 
   // 🎯 INTERESTS
   const interestMap = new Map();
@@ -140,20 +181,34 @@ WHERE u.user_id = ?;
     }
   });
 
-  // 🌿 LIFESTYLES
-  const lifestyleMap = new Map();
-  rows.forEach(r => {
-    if (r.lifestyle_id && !lifestyleMap.has(r.lifestyle_id)) {
-      lifestyleMap.set(r.lifestyle_id, {
-        id: r.lifestyle_id,
-        name: r.lifestyle_name
+// 🌿 LIFESTYLES (category + subcategory)
+const lifestyleMap = new Map();
+
+rows.forEach(r => {
+  if (r.lifestyle_subcategory_id) {
+
+    const key = r.lifestyle_subcategory_id;
+
+    if (!lifestyleMap.has(key)) {
+      lifestyleMap.set(key, {
+        category: {
+          id: r.lifestyle_category_id,
+          name: r.lifestyle_category_name
+        },
+        subcategory: {
+          id: r.lifestyle_subcategory_id,
+          name: r.lifestyle_subcategory_name
+        }
       });
     }
-  });
+  }
+});
+
 
   return {
     user,
     location,
+    language,
     images,
     interests: [...interestMap.values()],
     lifestyles: [...lifestyleMap.values()]

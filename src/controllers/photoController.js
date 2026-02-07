@@ -21,25 +21,58 @@ exports.getPhotosByUserId = async (req, res) => {
   }
 };
 
-exports.addPhoto = async (req, res) => {
-  try {
-    const user_id = req.params.user_id;
-    const { photo_url } = req.body;
-    console.log("Adding photo for user:", user_id, "with URL:", photo_url);
-    if (!photo_url) {
-      return res.status(400).json({ success: false, message: "photo_url required" });
-    } 
+// exports.addPhoto = async (req, res) => {
+//   try {
+//     const user_id = req.params.user_id;
+//     const { photo_url } = req.body;
+//     console.log("Adding photo for user:", user_id, "with URL:", photo_url);
+//     if (!photo_url) {
+//       return res.status(400).json({ success: false, message: "photo_url required" });
+//     } 
 
-    const result = await photoService.addPhoto(user_id, photo_url);
-    res.json(result);
-  } catch (error) {
-    console.error("addPhoto error:", error);    
+//     const result = await photoService.addPhoto(user_id, photo_url);
+//     res.json(result);
+//   } catch (error) {
+//     console.error("addPhoto error:", error);    
 
 
 
          
+//     res.status(500).json({ success: false, message: error.message });
+//   }  
+// };
+
+
+exports.addPhoto = async (req, res) => {
+  try {
+    const user_id = req.params.user_id;
+
+    const urls = req.body.photo_urls;
+
+    if (!urls || urls.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No photos uploaded",
+      });
+    }
+
+    const results = [];
+
+    for (const url of urls) {
+      const r = await photoService.addPhoto(user_id, url);
+      results.push(r);
+    }
+
+    res.json({
+      success: true,
+      message: "Photos uploaded successfully",
+      results,
+    });
+
+  } catch (error) {
+    console.error("addPhoto error:", error);
     res.status(500).json({ success: false, message: error.message });
-  }  
+  }
 };
 
 exports.updatePhotoUrl = async (req, res) => {

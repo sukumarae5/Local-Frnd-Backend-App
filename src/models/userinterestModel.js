@@ -1,6 +1,5 @@
 const db = require('../config/db');
 
-// ❌ Remove all old interests of a user
 const deleteByUserId = async (userId) => {
   const [result] = await db.query(
     "DELETE FROM user_interests WHERE user_id = ?",

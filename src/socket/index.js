@@ -3,6 +3,8 @@ const presenceHandler = require("./presence");
 const callSocket = require("./callSocket");
 const socketMap = require("./socketMap");
 const notification = require("./notification");
+const chatSocket = require("./chat");
+
 
 let ioInstance = null;
 
@@ -24,15 +26,17 @@ function init(io) {
     const wasOffline = !socketMap.isOnline(userId);
 
     socketMap.addSocket(userId, socket.id);
-    socket.join(userId); // 🔥 USER ROOM
+    socket.join(userId); 
 
     if (wasOffline) {
-      presenceHandler(io, userId, "online"); // non-blocking
+      presenceHandler(io, userId, "online"); 
     }
 
     callSocket(socket, io);
     notification(socket, io);
+    chatSocket(socket, io);
 
+    
     socket.on("disconnect", () => {
       console.log("⚠️ Socket disconnected:", userId, socket.id);
 

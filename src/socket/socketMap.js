@@ -49,6 +49,7 @@ function getAnySocket(userId) {
    ONLINE STATUS
 ========================= */
 function isOnline(userId) {
+  console.log("Checking online status for userId:", userId);  
   return userSockets.has(String(userId));
 }
 

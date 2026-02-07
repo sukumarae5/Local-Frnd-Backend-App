@@ -18,16 +18,25 @@ const createUserIfNotExist = async (mobile_number) => {
 };
 
 const markOnline = async (user_id) => {
-  await db.execute(
-    `
-    UPDATE user
-    SET is_online = 1,
-        last_seen = NOW()
-    WHERE user_id = ?
-    `,
-    [user_id]
-  );
+  try {
+    const [result] = await db.execute(
+      `
+      UPDATE user
+      SET is_online = 1,
+          last_seen = NOW()
+      WHERE user_id = ?
+      `,
+      [user_id]
+    );
+
+    console.log("markOnline result:", result);
+    console.log("affectedRows:", result.affectedRows);
+
+  } catch (err) {
+    console.error("markOnline error:", err);
+  }
 };
+
 
 const markOffline = async (user_id) => {
   await db.execute(

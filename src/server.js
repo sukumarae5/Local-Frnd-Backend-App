@@ -21,6 +21,8 @@ const userinterestRoutes = require("./routes/userinterestRoutes");
 const lifestyleRoutes = require("./routes/lifestyleRoutes");
 const lifestylecategoryRoutes = require("./routes/lifestylecategoryRoutes");
 const userlifestyleRoutes = require("./routes/userlifestyleRoutes");
+const chatRoutes = require("./routes/chatRoutes");
+
 
 const app=express();
 
@@ -73,10 +75,10 @@ app.use("/api/userinterest", userinterestRoutes);
 app.use('/api/lifestyle',lifestyleRoutes);
 app.use('/api/lifestylecategory',lifestylecategoryRoutes);
 app.use('/api/userlifestyle', userlifestyleRoutes);
+app.use("/api/chat", chatRoutes);
 
 
 app.use("/uploads", express.static("uploads"));
-
 
 app.use(express.json({ limit: "50mb" }));
 

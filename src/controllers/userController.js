@@ -42,7 +42,8 @@ exports.patchProfile = async (req, res) => {
   try {
     const user_id = req.user.user_id; 
     const updates = req.body;
-
+console.log("User ID from token:", user_id);
+  console.log("Updates to apply:", updates);
     if (!user_id) {
       return res.status(401).json({
         success: false,

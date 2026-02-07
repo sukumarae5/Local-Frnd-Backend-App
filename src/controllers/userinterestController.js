@@ -48,7 +48,63 @@ const getUserInterests = async (req, res) => {
   }
 };
 
+// controllers/userinterestController.js
+
+const updateUserInterests = async (req, res) => {
+  
+  console.log(req.body);
+  try {
+    const user_id = req.user.user_id;
+    const { interests } = req.body;
+
+    if (!Array.isArray(interests)) {
+      return res.status(400).json({
+        success: false,
+        message: "Interests array is required",
+      });
+    }
+
+    await UserInterestService.updateUserInterests(user_id, interests);
+
+    res.json({
+      success: true,
+      message: "User interests updated successfully",
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+
+const deleteUserInterests = async (req, res) => {
+  try {
+    const user_id = req.user.user_id;
+
+    await UserInterestService.deleteUserInterests(user_id);
+
+    res.json({
+      success: true,
+      message: "User interests deleted successfully",
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+
+
+
 module.exports = {
   saveUserInterests,
-  getUserInterests
+  getUserInterests,
+  updateUserInterests,
+  deleteUserInterests
 };
