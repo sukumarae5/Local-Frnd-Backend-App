@@ -49,3 +49,17 @@ exports.verifyOtp = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+exports.resendOtp = async (req, res) => {
+  try {
+    const { mobile_number } = req.body;
+
+    if (!mobile_number)
+      return res.status(400).json({ success: false, message: "Mobile number required" });
+
+    const result = await authService.resendOtp(mobile_number);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

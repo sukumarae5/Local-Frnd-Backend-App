@@ -21,6 +21,8 @@ exports.getUserProfile = async (userId) => {
   u.last_seen,
   u.location_lat,
   u.location_log,
+  u.avg_rating,
+  u.total_ratings,
 
   -- country / state / city
   c.id AS country_id,
