@@ -1,92 +1,162 @@
-const callModel =require("../models/callModel")
-const db = require('../config/db');
+const { v4: uuidv4 } = require("uuid");
+const db = require("../config/db");
+const callModel = require("../models/callModel");
 
-const createSearching= async ({ session_id, caller_id, type, coin_rate_per_min }) => {
-    return await callModel.createInitialSession({ session_id, caller_id, type, coin_rate_per_min });
-}
+/* ===============================
+   FEMALE START SEARCH
+=============================== */
+const startFemaleSearch = async (female_id, type) => {
+  const conn = await db.getConnection();
 
-const matchToReceiver= async (session_id, receiver_id) => {
-    return await callModel.setMatchedSession( session_id, receiver_id );
-}
+  try {
+    await conn.beginTransaction();
 
-const connectSession= async (session_id) => {
-    return await callModel.markConnected( session_id );
-}
+    // await callModel.cancelFemaleSearch(female_id);
+    // const active = await callModel.findActiveCallByUser(female_id);
+    // if (active && active.status === "CONNECTED") {
+    //   throw new Error("You are already in a call");
+    // }
+    await callModel.cancelFemaleSearchTx(conn, female_id);
 
+    await callModel.forceEndConnectedByUserTx(conn, female_id);
 
-const endSession= async (session_id) => {
-    return await callModel.markEnded( session_id );
-}
+    // // ✅ block only if really connected
+    // const connected =
+    //   await callModel.findConnectedCallByUserTx(conn, female_id);
 
-const findActiveByUser = async (user_id) => {
-  return await callModel.findActiveByUser(user_id);
+    // if (connected) {
+    //   throw new Error("You are already in a call");
+    // }
+
+    const session_id = "SEARCH_" + uuidv4();
+
+    await callModel.createFemaleSearchSession(
+      conn,
+      session_id,
+      female_id,
+      type
+    );
+
+    await conn.commit();
+    return session_id;
+
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
 };
 
 
-const getSession= async (session_id) => {
-    return await callModel.getSessionById( session_id );
-}
 
-const setInitialBalances= async (session_id, caller_balance, receiver_balance)=>{
-    return await callModel.setInitialBalances( session_id, caller_balance, receiver_balance );
-}
 
-const updateCallerBalance= async (session_id, caller_balance)=>{
-    return await callModel.updateCallerBalance( session_id, caller_balance );
-}
+const randomMatchMale = async (male_id, type) => {
+  console.log("Attempting random match for male:", male_id, type);
 
-const updateReceiverBalance= async (session_id, receiver_balance)=>{
-    return await callModel.updateReceiverBalance( session_id, receiver_balance );
-}
+  const conn = await db.getConnection();
 
-const deductCoins= async (user_id, coins) => {
-    let localConn = conn;
-    let created = false;
-    if (!localConn) {
-      localConn = await db.getConnection();
-      created = true;
-      await localConn.beginTransaction();
+  try {
+    await conn.beginTransaction();
+
+    const active = await callModel.findActiveCallByUser(male_id);
+    if (active) {
+      throw new Error("User already in call");
     }
-    try{
-        const [result] = await localConn.execute(`SELECT coin_balance FROM user WHERE user_id = ? FOR UPDATE`, [user_id]);
-    
-        if (result.length === 0) {
-          throw new Error("User not found");
-        }
-        const currentBalance = parseInt(result[0].coin_balance || 0, 10);
-         if (currentBalance < coins) {
-          throw new Error("Insufficient balance");
-        }
 
-        const newBalance = currentBalance - coins;
-        if (newBalance < 0) {
-          throw new Error("Insufficient balance");
-        }
-        await localConn.execute(`UPDATE user SET coin_balance = ? WHERE user_id = ?`, [newBalance, user_id]);
-    
-        if (created) {
-          await localConn.commit();
-        }   
-        return { success: true, newBalance:newBalance };
+    const femaleSession =
+      await callModel.findSearchingFemaleLocked(conn, type);
 
+    if (!femaleSession) {
+      await conn.rollback();
+      return null;
     }
-    catch(error){
-        if (created) {
-            await localConn.rollback();
-        }
-        throw error;
-    }
-}
 
-module.exports={
-    createSearching,
-    matchToReceiver,
-    connectSession,
-    findActiveByUser,
-    endSession,
-    getSession,
-    setInitialBalances,
-    updateCallerBalance,
-    updateReceiverBalance,
-    deductCoins
-}
+    await callModel.matchSession(
+      conn,
+      femaleSession.session_id,
+      male_id
+    );
+
+    const [rows] = await conn.execute(
+      `SELECT * FROM call_sessions WHERE session_id = ?`,
+      [femaleSession.session_id]
+    );
+
+    await conn.commit();
+
+    return rows[0];
+
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+};
+
+
+const directMatchMale = async (male_id, female_id, type) => {
+  const conn = await db.getConnection();
+
+  try {
+    await conn.beginTransaction();
+
+    const active = await callModel.findActiveCallByUser(male_id);
+    if (active) {
+      throw new Error("User already in call");
+    }
+
+    const femaleSession =
+      await callModel.findSpecificFemaleLocked(conn, female_id, type);
+
+    if (!femaleSession) {
+      await conn.rollback();
+      return null;
+    }
+
+    await callModel.matchSession(
+      conn,
+      femaleSession.session_id,
+      male_id
+    );
+
+    const [rows] = await conn.execute(
+      `SELECT * FROM call_sessions WHERE session_id = ?`,
+      [femaleSession.session_id]
+    );
+
+    await conn.commit();
+
+    return rows[0];
+
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+};
+
+
+const cancelSearch = async (female_id) => {
+  await callModel.cancelFemaleSearch(female_id);
+};
+
+const endSession = async (session_id) => {
+  return await callModel.endSession(session_id);
+};
+
+
+const getConnectedCallDetails = async (user_id) => {
+  return await callModel.getConnectedCallBothUsers(user_id);
+};
+
+module.exports = {
+  startFemaleSearch,
+  randomMatchMale,
+  directMatchMale,
+  cancelSearch,
+  endSession,
+  getConnectedCallDetails
+};

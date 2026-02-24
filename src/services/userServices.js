@@ -69,6 +69,61 @@ const patchProfile = async (user_id, data) => {
   const user = await userModel.findById(user_id);
   if (!user) throw new Error("User not found")
 
+      // 🔹 FULL NAME VALIDATION (NEW)
+  if (data.name !== undefined) {
+    if (typeof data.name !== "string" || data.name.trim().length < 2) {
+      return { success: false, message: "Full name must be at least 2 characters" };
+    }
+
+    if (containsProfanity(data.name)) {
+      return { success: false, message: "Full name contains inappropriate words" };
+    }
+
+    data.name = data.name.trim();
+  }
+
+  // 🔹 USERNAME VALIDATION (NEW)
+  if (data.username !== undefined) {
+    if (!/^[a-zA-Z0-9_.]{3,20}$/.test(data.username)) {
+      return {
+        success: false,
+        message: "Username must be 3-20 characters and contain only letters, numbers, _ or ."
+      };
+    }
+
+    const taken = await userModel.isUsernameTaken(data.username, user_id);
+    if (taken) {
+      return {
+        success: false,
+        message: "Username already taken"
+      };
+    }
+  }
+
+      // 🔹 LOCATION VALIDATION (NEW - MODEL BASED)
+  if (data.country_id || data.state_id || data.city_id) {
+
+    const countryId = data.country_id || user.country_id;
+    const stateId   = data.state_id   || user.state_id;
+    const cityId    = data.city_id    || user.city_id;
+
+    // Validate state belongs to country
+    if (countryId && stateId) {
+      const validState = await userModel.isValidStateForCountry(stateId, countryId);
+      if (!validState) {
+        throw new Error("Invalid state for selected country");
+      }
+    }
+
+    // Validate city belongs to state
+    if (stateId && cityId) {
+      const validCity = await userModel.isValidCityForState(cityId, stateId);
+      if (!validCity) {
+        throw new Error("Invalid city for selected state");
+      }
+    }
+  }
+
   if (data.date_of_birth) {
     const dob = parseDateOfBirth(data.date_of_birth);
     if (!dob) {
@@ -187,6 +242,37 @@ const updateProfile = async (user_id, data) => {
   const user = await userModel.findById(user_id);
   if (!user) throw new Error("User not found");
 
+    // 🔹 FULL NAME VALIDATION (NEW)
+  if (data.name !== undefined) {
+    if (typeof data.name !== "string" || data.name.trim().length < 2) {
+      return { success: false, message: "Full name must be at least 2 characters" };
+    }
+
+    if (containsProfanity(data.name)) {
+      return { success: false, message: "Full name contains inappropriate words" };
+    }
+
+    data.name = data.name.trim();
+  }
+
+  // 🔹 USERNAME VALIDATION (NEW)
+  if (data.username !== undefined) {
+    if (!/^[a-zA-Z0-9_.]{3,20}$/.test(data.username)) {
+      return {
+        success: false,
+        message: "Username must be 3-20 characters and contain only letters, numbers, _ or ."
+      };
+    }
+
+    const taken = await userModel.isUsernameTaken(data.username, user_id);
+    if (taken) {
+      return {
+        success: false,
+        message: "Username already taken"
+      };
+    }
+  }
+
   const required = ["date_of_birth", "gender","language_id", "location_lat", "location_log"];
   const missing = required.filter(
   field => data[field] === undefined || data[field] === null
@@ -198,6 +284,33 @@ const updateProfile = async (user_id, data) => {
       message: `Missing fields: ${missing.join(", ")}`
     };
   }
+
+    // 🔹 LOCATION VALIDATION (NEW - MODEL BASED)
+  if (data.country_id || data.state_id || data.city_id) {
+
+    // Validate state belongs to country
+    if (data.country_id && data.state_id) {
+      const validState = await userModel.isValidStateForCountry(
+        data.state_id,
+        data.country_id
+      );
+      if (!validState) {
+        throw new Error("Invalid state for selected country");
+      }
+    }
+
+    // Validate city belongs to state
+    if (data.state_id && data.city_id) {
+      const validCity = await userModel.isValidCityForState(
+        data.city_id,
+        data.state_id
+      );
+      if (!validCity) {
+        throw new Error("Invalid city for selected state");
+      }
+    }
+  }
+
 
    if (data.date_of_birth) {
     const dob = parseDateOfBirth(data.date_of_birth);
@@ -394,6 +507,17 @@ const connectMaleToNearestFemale = async (userId) => {
   };
 };
 
+const getRandomOnlineSearchingFemales = async () => {
+  const users =
+    await userModel.getRandomOnlineSearchingFemalesWithAvatar(20);
+
+  return {
+    success: true,
+    total: users.length,
+    users
+  };
+};
+
 module.exports = {
   getAllUsers,
   getProfileById,
@@ -406,5 +530,6 @@ module.exports = {
   connectToSpecificUser,
   connectRandomUserOppositeGender,
   connectMaleToNearestFemale,
-  connectNearbyForMale
+  connectNearbyForMale,
+  getRandomOnlineSearchingFemales
 };

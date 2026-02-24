@@ -18,16 +18,25 @@ const createUserIfNotExist = async (mobile_number) => {
 };
 
 const markOnline = async (user_id) => {
-  await db.execute(
-    `
-    UPDATE user
-    SET is_online = 1,
-        last_seen = NOW()
-    WHERE user_id = ?
-    `,
-    [user_id]
-  );
+  try {
+    const [result] = await db.execute(
+      `
+      UPDATE user
+      SET is_online = 1,
+          last_seen = NOW()
+      WHERE user_id = ?
+      `,
+      [user_id]
+    );
+
+    console.log("markOnline result:", result);
+    console.log("affectedRows:", result.affectedRows);
+
+  } catch (err) {
+    console.error("markOnline error:", err);
+  }
 };
+
 
 const markOffline = async (user_id) => {
   await db.execute(
@@ -127,6 +136,34 @@ const getRandomUsers = async (currentUserId) => {
   return rows;
 };
 
+// 🔹 Check if state belongs to country
+const isValidStateForCountry = async (state_id, country_id) => {
+  const [rows] = await db.execute(
+    "SELECT id FROM states WHERE id = ? AND country_id = ?",
+    [state_id, country_id]
+  );
+  return rows.length > 0;
+};
+
+// 🔹 Check if city belongs to state
+const isValidCityForState = async (city_id, state_id) => {
+  const [rows] = await db.execute(
+    "SELECT id FROM cities WHERE id = ? AND state_id = ?",
+    [city_id, state_id]
+  );
+  return rows.length > 0;
+};
+
+
+// 🔹 Check if username already exists (except current user)
+const isUsernameTaken = async (username, user_id) => {
+  const [rows] = await db.execute(
+    "SELECT user_id FROM user WHERE username = ? AND user_id != ? LIMIT 1",
+    [username, user_id]
+  );
+  return rows.length > 0;
+};
+
 
 const getProfileById=async (user_id) => {
      const [rows] = await db.execute(
@@ -186,7 +223,7 @@ const getRandomOnlineOppositeGenderUser = async (currentUserId) => {
       AND gender = ?
       AND status = 'active'
     ORDER BY RAND()
-    LIMIT 1
+    LIMIT 10
     `,
     [currentUserId, targetGender]
   );
@@ -319,6 +356,36 @@ const getNearestOnlineFemaleForMale = async (maleUserId, radiusKm = 50) => {
   return rows[0] || null;
 };
 
+const getRandomOnlineSearchingFemalesWithAvatar = async (limit = 20) => {
+  limit = Number(limit); // 🔥 IMPORTANT
+
+  const [rows] = await db.execute(
+    `
+    SELECT 
+      u.user_id,
+      u.name,
+      cs.type AS call_type,
+      a.avatar_id,
+      a.image_url AS avatar_url
+    FROM user u
+    INNER JOIN call_sessions cs
+      ON cs.caller_id = u.user_id
+    LEFT JOIN avatars a
+      ON a.avatar_id = u.avatar_id
+    WHERE u.gender = 'Female'
+      AND u.is_online = 1
+      AND cs.status = 'SEARCHING'
+    ORDER BY RAND()
+    LIMIT ${limit}
+    `
+  );
+
+  return rows;
+};
+
+
+
+
 module.exports={
     createUserIfNotExist,
     findByMobile,
@@ -333,11 +400,15 @@ module.exports={
     updateProfile,
     updateCoinBalance,
     getAllUsers,
+    isValidStateForCountry,
+    isValidCityForState,
+    isUsernameTaken,
     deleteUserId,
     getRandomUsers,
     getProfileById,
     isUserOnline,
     markOffline,
     markOnline,
-    getRandomOnlineUser
+    getRandomOnlineUser,
+    getRandomOnlineSearchingFemalesWithAvatar
 }

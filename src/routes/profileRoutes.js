@@ -6,4 +6,10 @@ const profileController = require("../controllers/profileController");
 
 router.get("/profile", authenticateUser, profileController.getProfile);
 
+router.get(
+  "/profile/:userId",
+  profileController.getPublicProfile
+);
+
+
 module.exports = router;

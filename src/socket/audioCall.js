@@ -1,25 +1,16 @@
 const CallService = require("../services/callServices");
 const coinService = require("../services/coinService");
 
-/**
- * sessionId -> Set(userId)
- */
+
 const joinedUsers = new Map();
 
-/**
- * sessionId -> lastPing
- */
 const heartbeats = new Map();
 
-/**
- * sessions already connected
- */
 const connectedSessions = new Set();
 
 module.exports = (socket, io) => {
   const userId = String(socket.user.user_id);
 
-  /* ================= JOIN ================= */
   socket.on("audio_join", async ({ session_id }) => {
     const room = `call:${session_id}`;
     socket.join(room);
@@ -43,6 +34,8 @@ module.exports = (socket, io) => {
 
       try {
         await CallService.connectSession(session_id);
+
+        coinService.startLiveBilling(session_id, io);
       } catch (err) {
         console.error("⚠️ connectSession:", err.message);
       }
@@ -74,6 +67,7 @@ module.exports = (socket, io) => {
     console.log("📴 audio_call_hangup", session_id);
 
     try {
+      coinService.stopLiveBilling(session_id)
       await CallService.endSession(session_id);
       await coinService.finalizeOnHangup(session_id);
     } catch (err) {

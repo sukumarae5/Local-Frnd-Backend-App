@@ -18,36 +18,79 @@ const upload = multer({
   },
 });
 
-const uploadMiddleware = upload.single("image");
+// const uploadMiddleware = upload.single("photo");
+const uploadMiddleware = upload.array("photos", 5);
+
+// const processImage = async (req, res, next) => {
+//   try {
+//     if (!req.file) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Image file is required",
+//       });
+//     }
+
+//     const uploadStream = cloudinary.uploader.upload_stream(
+//       {
+//         resource_type: "image",
+//       },
+//       (error, result) => {
+//         if (error) {
+//           console.error("❌ Cloudinary error:", error);
+//           return res.status(500).json({
+//             success: false,
+//             message: "Image upload failed",
+//           });
+//         }
+
+//         req.body.photo_url = result.secure_url;;
+//         next();
+//       }
+//     );
+
+//     streamifier.createReadStream(req.file.buffer).pipe(uploadStream);
+//   } catch (err) {
+//     console.error("❌ Image middleware error:", err);
+//     res.status(500).json({
+//       success: false,
+//       message: "Image processing error",
+//     });
+//   }
+// };
 
 const processImage = async (req, res, next) => {
   try {
-    if (!req.file) {
+    if (!req.files || req.files.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "Image file is required",
+        message: "Image files are required",
       });
     }
 
-    const uploadStream = cloudinary.uploader.upload_stream(
-      {
-        resource_type: "image", // ❌ NO folder
-      },
-      (error, result) => {
-        if (error) {
-          console.error("❌ Cloudinary error:", error);
-          return res.status(500).json({
-            success: false,
-            message: "Image upload failed",
-          });
-        }
+    const uploadOne = (file) =>
+      new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          {
+            folder: "profile_photos",
+            resource_type: "image",
+          },
+          (error, result) => {
+            if (error) return reject(error);
+            resolve(result.secure_url);
+          }
+        );
 
-        req.body.image_url = result.secure_url;
-        next();
-      }
+        streamifier.createReadStream(file.buffer).pipe(uploadStream);
+      });
+
+    const uploadedUrls = await Promise.all(
+      req.files.map((file) => uploadOne(file))
     );
 
-    streamifier.createReadStream(req.file.buffer).pipe(uploadStream);
+    // pass to controller
+    req.body.photo_urls = uploadedUrls;
+
+    next();
   } catch (err) {
     console.error("❌ Image middleware error:", err);
     res.status(500).json({
@@ -56,6 +99,7 @@ const processImage = async (req, res, next) => {
     });
   }
 };
+
 
 module.exports = {
   uploadMiddleware,

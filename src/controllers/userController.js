@@ -40,9 +40,10 @@ exports.updateProfile = async (req, res) => {
 exports.patchProfile = async (req, res) => {
   console.log("Patch profile request body:", req.body);
   try {
-    const user_id = req.user.user_id; // from auth middleware
+    const user_id = req.user.user_id; 
     const updates = req.body;
-
+console.log("User ID from token:", user_id);
+  console.log("Updates to apply:", updates);
     if (!user_id) {
       return res.status(401).json({
         success: false,
@@ -127,7 +128,7 @@ exports.connectRandomOppositeGender = async (req, res) => {
 
 exports.nearbyForMale = async (req, res) => {
   const userId = req.user.user_id;
-  const result = await userService.connectNearbyForMale(userId);
+  const result = await profileService.connectNearbyForMale(userId);
   res.json(result);
 };
 
@@ -136,11 +137,27 @@ exports.connectNearestFemale = async (req, res) => {
   try {
     const userId = req.user.user_id;
 
-    const result = await userService.connectMaleToNearestFemale(userId);
+    const result = await profileService.connectMaleToNearestFemale(userId);
 
     return res.json(result);
   } catch (err) {
     console.error("connectNearestFemale error", err);
+    res.status(500).json({
+      success: false,
+      message: "Server error"
+    });
+  }
+};
+
+exports.browseRandomFemales = async (req, res) => {
+  console.log(req)
+  try {
+    const result =
+      await profileService.getRandomOnlineSearchingFemales();
+console.log(result)
+    return res.json(result);
+  } catch (error) {
+    console.error("browseRandomFemales error", error);
     res.status(500).json({
       success: false,
       message: "Server error"
