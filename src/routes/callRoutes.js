@@ -14,4 +14,11 @@ router.get(
   callController.getConnectedCallDetails
 );
 
+router.post(
+  "/friend-connect",
+  authenticateUser,
+  callController.friendConnect
+);
+
+
 module.exports = router;

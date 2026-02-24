@@ -1,11 +1,27 @@
-const service = require("../services/notificationService");
 
-exports.list = async (req, res) => {
-  const data = await service.list(req.user.user_id);
+
+const notificationService = require("../services/notificationService");
+
+exports.getNotifications = async (req, res) => {
+  const userId = req.user.user_id;
+
+  const data = await notificationService.getNotifications(userId);
+
   res.json(data);
 };
 
-exports.read = async (req, res) => {
-  await service.read(req.body.id, req.user.user_id);
+exports.markRead = async (req, res) => {
+  const userId = req.user.user_id;
+
+  await notificationService.markNotificationsRead(userId);
+
   res.json({ success: true });
+};
+
+exports.unreadCount = async (req, res) => {
+  const userId = req.user.user_id;
+
+  const count = await notificationService.getUnreadCount(userId);
+
+  res.json({ unread: count });
 };

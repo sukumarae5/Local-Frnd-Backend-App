@@ -37,11 +37,34 @@ const sendLoginOtp = async (mobile_number) => {
 };
 
 
+// const verifyOtp = async (mobile_number, otp) => {
+//   const user = await userModel.findByMobileAndOtp(mobile_number, otp);
+//   if (!user) return { success: false, message: "Invalid number or OTP" };
+
+//   await userModel.createUserIfNotExist(mobile_number);
+//   await userModel.clearOtp(mobile_number);
+
+//   const freshUser = await userModel.findByMobile(mobile_number);
+//   const token = generateToken(freshUser);
+
+//   return {
+//     success: true,
+//     token,
+//     user: freshUser,
+//     next_step: freshUser.profile_completed ? "home" : "complete_profile"
+//   };
+// };
+
 const verifyOtp = async (mobile_number, otp) => {
   const user = await userModel.findByMobileAndOtp(mobile_number, otp);
-  if (!user) return { success: false, message: "Invalid number or OTP" };
 
-  await userModel.createUserIfNotExist(mobile_number);
+  if (!user) {
+    return { 
+      success: false, 
+      message: "Invalid or expired OTP" 
+    };
+  }
+
   await userModel.clearOtp(mobile_number);
 
   const freshUser = await userModel.findByMobile(mobile_number);
@@ -55,8 +78,31 @@ const verifyOtp = async (mobile_number, otp) => {
   };
 };
 
+const resendOtp = async (mobile_number) => {
+  const user = await userModel.findByMobile(mobile_number);
+
+  if (!user) {
+    return { success: false, message: "User not found" };
+  }
+if (user.otp_expires_at && new Date(user.otp_expires_at) > new Date()) {
+  return {
+    success: false,
+    message: "Please wait before requesting new OTP"
+  };
+}
+
+  const otp = generateOtp();
+  await userModel.createOrUpdateOtp(mobile_number, otp);
+
+  console.log(`🔁 Resend OTP for ${mobile_number}: ${otp}`);
+
+  return { success: true, message: "OTP resent successfully" };
+};
+
+
 module.exports = {
   registerUser,
   sendLoginOtp,
   verifyOtp,
+  resendOtp
 };

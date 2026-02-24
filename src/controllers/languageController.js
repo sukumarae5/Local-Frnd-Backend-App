@@ -13,6 +13,7 @@ exports.createLanguage= async (req, res) => {
 }
 
 
+
 exports.getAllLanguages = async(req, res)=>{
     try{
         const languages= await languageServices.getAllLanguages()

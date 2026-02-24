@@ -22,6 +22,11 @@ const lifestyleRoutes = require("./routes/lifestyleRoutes");
 const lifestylecategoryRoutes = require("./routes/lifestylecategoryRoutes");
 const userlifestyleRoutes = require("./routes/userlifestyleRoutes");
 const chatRoutes = require("./routes/chatRoutes");
+const ratingRoutes = require("./routes/ratingRoutes");
+const faqRoutes = require("./routes/faqRoutes");
+const supportRoutes = require("./routes/supportRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");  
+const errorHandler = require("./middlewares/errorMiddleware");
 
 
 const app=express();
@@ -76,6 +81,11 @@ app.use('/api/lifestyle',lifestyleRoutes);
 app.use('/api/lifestylecategory',lifestylecategoryRoutes);
 app.use('/api/userlifestyle', userlifestyleRoutes);
 app.use("/api/chat", chatRoutes);
+app.use("/api/rating", ratingRoutes);
+app.use("/api/faqs", faqRoutes);
+app.use("/api/support", supportRoutes);
+app.use("/notifications", notificationRoutes);
+app.use(errorHandler);
 
 
 app.use("/uploads", express.static("uploads"));

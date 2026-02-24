@@ -1,8 +1,5 @@
 const db = require("../config/db");
 
-/* ===============================
-   FEMALE START SEARCHING
-=============================== */
 const createFemaleSearchSession = async (conn, session_id, female_id, type) => {
   try {
     console.log("Creating female search session:", {
@@ -64,9 +61,7 @@ const findSearchingFemaleLocked = async (conn, type) => {
 };
 
 
-/* ===============================
-   FIND SPECIFIC FEMALE (LOCKED)
-=============================== */
+
 const findSpecificFemaleLocked = async (conn, female_id, type) => {
   const [rows] = await conn.execute(
     `
@@ -85,10 +80,6 @@ const findSpecificFemaleLocked = async (conn, female_id, type) => {
 };
 
 
-
-/* ===============================
-   MATCH SESSION
-=============================== */
 const matchSession = async (conn, session_id, male_id) => {
   const [result] = await conn.execute(
     `
@@ -112,11 +103,10 @@ const matchSession = async (conn, session_id, male_id) => {
   return result;
 };
 
-
-/* ===============================
-   ACTIVE CALL CHECK
-=============================== */
 const findActiveCallByUser = async (user_id) => {
+  
+  console.log("Checking active call for user:", user_id); 
+
   const [rows] = await db.execute(
     `
     SELECT *
@@ -127,7 +117,7 @@ const findActiveCallByUser = async (user_id) => {
     `,
     [user_id, user_id]
   );
-
+console.log("findActiveCallByUser - rows:", rows);
   return rows[0] || null;
 };
 
@@ -147,9 +137,7 @@ const findConnectedCallByUserTx = async (conn, user_id) => {
   return rows[0] || null;
 };
 
-/* ===============================
-   END SESSION
-=============================== */
+
 const endSession = async (session_id) => {
   const [result] = await db.execute(
     `
@@ -174,10 +162,6 @@ const endSession = async (session_id) => {
 };
 
 
-
-/* ===============================
-   LIST SEARCHING FEMALES
-=============================== */
 const getSearchingFemales = async () => {
   const [rows] = await db.execute(
     `
@@ -198,9 +182,7 @@ console.log("getSearchingFemales - rows:", rows);
 };
 
 
-/* ===============================
-   CANCEL FEMALE SEARCH
-=============================== */
+
 const cancelFemaleSearch = async (female_id) => {
   await db.execute(
     `
@@ -226,7 +208,6 @@ const cancelFemaleSearchTx = async (conn, female_id) => {
     [female_id]
   );
 };
-
 
 
 const getConnectedCallBothUsers = async (user_id) => {
@@ -289,6 +270,70 @@ const forceEndConnectedByUserTx = async (conn, user_id) => {
   );
 };
 
+const createFriendSession = async (
+  conn,
+  session_id,
+  caller_id,
+  receiver_id,
+  type
+) => {
+
+  const [result] = await conn.execute(
+    `
+    INSERT INTO call_sessions
+    (
+      session_id,
+      caller_id,
+      receiver_id,
+      status,
+      type,
+      coin_rate_per_min,
+      finalized,
+      created_at,
+      updated_at
+    )
+    VALUES
+    (?, ?, ?, 'RINGING', ?, 0, 0, NOW(), NOW())
+    `,
+    [session_id, caller_id, receiver_id, type]
+  );
+
+  return result;
+};
+
+const getSessionUsers = async (session_id) => {
+
+  const [rows] = await db.execute(
+    `
+    SELECT session_id, caller_id, receiver_id
+    FROM call_sessions
+    WHERE session_id = ?
+    LIMIT 1
+    `,
+    [session_id]
+  );
+
+  return rows[0] || null;
+};
+
+const connectSession = async (session_id) => {
+  const [result] = await db.execute(
+    `
+    UPDATE call_sessions
+    SET status = 'CONNECTED',
+        started_at = NOW(),
+        updated_at = NOW()
+    WHERE session_id = ?
+      AND status = 'RINGING'
+    `
+    ,
+    [session_id]
+  );
+
+  return result;
+};
+
+
 
 
 module.exports = {
@@ -303,5 +348,8 @@ module.exports = {
   findConnectedCallByUserTx,
   cancelFemaleSearchTx,
   getConnectedCallBothUsers,
-  forceEndConnectedByUserTx
+  forceEndConnectedByUserTx,
+  createFriendSession,
+  getSessionUsers,
+  connectSession
 };

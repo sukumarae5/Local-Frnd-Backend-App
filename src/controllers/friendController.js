@@ -1,5 +1,8 @@
 const friendService = require("../services/friendServices");
+const notificationService = require("../services/notificationService");
 const { getIO } = require("../socket");
+
+/* ================= SEND REQUEST ================= */
 
 exports.sendRequest = async (req, res) => {
   const from = req.user.user_id;
@@ -14,49 +17,74 @@ exports.sendRequest = async (req, res) => {
   if (!created) {
     return res.json({
       success: false,
-      message: "Friend request already exists",
+      message: "Request already exists",
     });
   }
 
-  getIO().to(String(to)).emit("friend_request", {
+  await notificationService.createNotification(
     from,
-    type: "FRIEND_REQUEST",
-    time: Date.now(),
-  });
+    to,
+    "FRIEND_REQUEST",
+    "Sent you a friend request"
+  );
+
+  getIO().to(String(to)).emit("new_notification");
 
   res.json({ success: true });
 };
-
 
 exports.acceptRequest = async (req, res) => {
-  const { request_id } = req.body;
+  console.log("Accepting friend request...", req.body); 
   const me = req.user.user_id;
+  const { sender_id } = req.body;
 
-  const senderId = await friendService.accept(request_id, me);
+  const request = await friendService.getPendingRequest(sender_id, me);
 
-  if (!senderId) {
-    return res.status(400).json({ error: "Invalid request" });
+  if (!request) {
+    return res.status(400).json({ error: "No pending request" });
   }
 
-  // notify sender
-  getIO().to(String(senderId)).emit("friend_accept", {
-    by: me,
-    type: "FRIEND_ACCEPT",
-    time: Date.now(),
-  });
+  await friendService.accept(request.id, me);
 
-  // notify receiver (self)
-  getIO().to(String(me)).emit("friend_accept", {
-    by: me,
-    type: "FRIEND_ACCEPT",
-    time: Date.now(),
-  });
+  // DELETE notification instead of updating
+  await notificationService.deleteFriendRequestNotification(
+    sender_id,
+    me
+  );
+
+  getIO().to(String(sender_id)).emit("new_notification");
+
+  res.json({ success: true });
+};
+/* ================= REJECT REQUEST ================= */
+
+exports.rejectRequest = async (req, res) => {
+  const me = req.user.user_id;
+  const { sender_id } = req.body;
+
+  if (!sender_id) {
+    return res.status(400).json({ error: "sender_id required" });
+  }
+
+  // Check if pending request exists
+  const request = await friendService.getPendingRequest(sender_id, me);
+
+  if (!request) {
+    return res.status(400).json({ error: "No pending request" });
+  }
+
+  // Option A: DELETE row (recommended)
+  await friendService.reject(sender_id, me);
+
+  // Delete notification
+  await notificationService.deleteFriendRequestNotification(
+    sender_id,
+    me
+  );
 
   res.json({ success: true });
 };
 
-
-/* ================= FRIEND LIST ================= */
 exports.myFriends = async (req, res) => {
   const data = await friendService.list(req.user.user_id);
   res.json(data);

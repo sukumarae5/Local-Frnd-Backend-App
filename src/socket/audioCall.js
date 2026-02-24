@@ -14,7 +14,7 @@ module.exports = (socket, io) => {
   socket.on("audio_join", async ({ session_id }) => {
     const room = `call:${session_id}`;
     socket.join(room);
-
+ socket.session_id = session_id;
     if (!joinedUsers.has(session_id)) {
       joinedUsers.set(session_id, new Set());
     }

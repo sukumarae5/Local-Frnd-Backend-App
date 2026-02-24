@@ -1,10 +1,9 @@
 const callService = require("../services/callServices");
 const callModel = require("../models/callModel");
 const { getIO } = require("../socket");
+const socketMap = require("../socket/socketMap");
 
-/* ===============================
-   FEMALE START SEARCH
-=============================== */
+
 const startSearch = async (req, res) => {
   console.log("Starting search for user:", req.user);
 
@@ -33,9 +32,6 @@ const startSearch = async (req, res) => {
 };
 
 
-/* ===============================
-   LIST SEARCHING FEMALES
-=============================== */
 const searchingFemales = async (req, res) => {
   const data = await callModel.getSearchingFemales();
   console.log("Searching females data:", data); 
@@ -43,9 +39,6 @@ const searchingFemales = async (req, res) => {
 };
 
 
-/* ===============================
-   RANDOM CONNECT (MALE)
-=============================== */
 const randomConnect = async (req, res) => {
   console.log("Random connect request:", req.user, req.body);
 
@@ -88,9 +81,7 @@ io.to(String(session.caller_id)).emit("incoming_call", {
 };
 
 
-/* ===============================
-   DIRECT CONNECT (MALE)
-=============================== */
+
 const directConnect = async (req, res) => {
   try {
     if (req.user.gender !== "Male") {
@@ -116,7 +107,8 @@ const directConnect = async (req, res) => {
     io.to(String(session.caller_id)).emit("incoming_call", {
       session_id: session.session_id,
       from: req.user.user_id,
-      call_type
+      call_type,
+      
     });
 
     res.json({
@@ -131,9 +123,7 @@ const directConnect = async (req, res) => {
 };
 
 
-/* ===============================
-   CANCEL SEARCH
-=============================== */
+
 const cancelSearch = async (req, res) => {
   try {
     if (req.user.gender !== "Female") {
@@ -196,6 +186,108 @@ console.log("Connected call details:", row);
   }
 };
 
+// const friendConnect = async (req, res) => {
+// console.log("Friend connect request:",  req.body);
+//   try {
+
+//     const { friend_id, call_type } = req.body;
+// console.log("Friend connect request:", req.user, friend_id, call_type); 
+//     const session = await callService.friendConnect(
+//       req.user.user_id,
+//       friend_id,
+//       call_type
+//     );
+// console.log("Friend connect session:", session);
+//     console.log("fghjkl", socketMap)
+//     if (!socketMap.isOnline(String(friend_id))) {
+//       return res.json({ status: "USER_OFFLINE" });
+//     }
+
+//     const io = getIO();
+
+//     io.to(String(friend_id)).emit("incoming_call", {
+//       session_id: session.session_id,
+//       from: req.user.user_id,
+//       call_type,
+//       status: "RINGING",
+//       is_friend: true
+//     });
+
+//     return res.json({
+//       status: "RINGING",
+//       session_id: session.session_id
+//     });
+
+//   } catch (err) {
+
+//     if (err.message === "USER_BUSY") {
+//       return res.json({ status: "BUSY" });
+//     }
+
+//     if (err.message === "FRIEND_BUSY") {
+//       return res.json({ status: "BUSY" });
+//     }
+
+//     if (err.message === "NOT_FRIEND") {
+//       return res.status(403).json({ error: "Not friends" });
+//     }
+
+//     return res.status(400).json({ error: err.message });
+//   }
+// };
+
+const friendConnect = async (req, res) => {
+
+  try {
+
+    const { friend_id, call_type } = req.body;
+
+    const session = await callService.friendConnect(
+      req.user.user_id,
+      friend_id,
+      call_type
+    );
+
+    if (!socketMap.isOnline(String(friend_id))) {
+      return res.json({ status: "USER_OFFLINE" });
+    }
+
+    const io = getIO();
+
+    io.to(String(friend_id)).emit("incoming_call", {
+      session_id: session.session_id,
+      from: req.user.user_id,
+      call_type: session.type,   // safer
+      status: "RINGING",
+      is_friend: true
+    });
+
+    return res.json({
+      status: "RINGING",
+      session_id: session.session_id,
+      call_type: session.type,
+      is_friend: true
+    });
+
+  } catch (err) {
+
+    if (err.message === "USER_BUSY") {
+      return res.json({ status: "BUSY" });
+    }
+
+    if (err.message === "FRIEND_BUSY") {
+      return res.json({ status: "BUSY" });
+    }
+
+    if (err.message === "NOT_FRIEND") {
+      return res.status(403).json({ error: "Not friends" });
+    }
+
+    return res.status(400).json({ error: err.message });
+  }
+};
+
+
 
 module.exports = {
   startSearch,
@@ -203,5 +295,6 @@ module.exports = {
   randomConnect,
   directConnect,
   cancelSearch,
-  getConnectedCallDetails
+  getConnectedCallDetails,
+  friendConnect
 };

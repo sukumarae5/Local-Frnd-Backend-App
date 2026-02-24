@@ -35,7 +35,13 @@ const listByStatus = async (userId, status) => {
 const adminList = async (status) => {
   return await Friend.adminList(status);
 };
+const getPendingRequest = async (senderId, receiverId) => {
+  return await Friend.getPendingRequest(senderId, receiverId);
+};
 
+const reject = async (senderId, receiverId) => {
+  return await Friend.reject(senderId, receiverId);
+};
 
 module.exports = {
   sendRequest,
@@ -46,4 +52,6 @@ module.exports = {
   remove,
   listByStatus,
   adminList,
+  getPendingRequest,
+  reject,
 };

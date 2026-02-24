@@ -1,27 +1,39 @@
 const db = require("../config/db");
 const CoinModel = require("../models/coinModel");
 
+/*
+  MALE pays:
+    AUDIO = 1 rupee / minute
+    VIDEO = 2 rupees / minute
+
+  FEMALE earns:
+    1 ring for every 5 minutes
+*/
 
 const RATES = {
-  AUDIO: 5,
-  VIDEO: 10,
+  AUDIO: 1,
+  VIDEO: 2,
 };
 
-
-const activeIntervals = new Map(); 
-const warnedSessions = new Set();  
-
+const femaleSeconds = new Map();
+const activeIntervals = new Map();
+const warnedSessions = new Set();
 
 function startLiveBilling(session_id, io) {
+
   if (activeIntervals.has(session_id)) return;
 
+  if (!femaleSeconds.has(session_id)) {
+    femaleSeconds.set(session_id, 0);
+  }
+
   const interval = setInterval(async () => {
+
     const conn = await db.getConnection();
 
     try {
       await conn.beginTransaction();
 
-      
       const [[session]] = await conn.execute(
         `SELECT * FROM call_sessions WHERE session_id=? FOR UPDATE`,
         [session_id]
@@ -33,79 +45,73 @@ function startLiveBilling(session_id, io) {
         return;
       }
 
-      const rate = session.coin_rate_per_min;
+      const rate = RATES[session.type];
 
-      const caller = await CoinModel.getUserBalanceForUpdate(
-        session.caller_id,
+      // male is receiver
+      const male = await CoinModel.getUserBalanceForUpdate(
+        session.receiver_id,
         conn
       );
 
-     
+      /* ============================
+         LOW BALANCE WARNING
+      ============================ */
+
       if (
-        caller.coin_balance < rate * 2 &&
-        caller.coin_balance >= rate &&
+        male.coin_balance < rate * 2 &&
+        male.coin_balance >= rate &&
         !warnedSessions.has(session_id)
       ) {
         warnedSessions.add(session_id);
 
         io?.to(`call:${session_id}`).emit("low_balance_warning", {
-          remainingCoins: caller.coin_balance,
-          secondsLeft: 10,
+          remainingCoins: male.coin_balance,
+          secondsLeft: 60,
         });
 
-        setTimeout(async () => {
-          const conn2 = await db.getConnection();
-          try {
-            await conn2.beginTransaction();
-
-            const [[latest]] = await conn2.execute(
-              `SELECT coin_balance FROM user WHERE user_id=? FOR UPDATE`,
-              [session.caller_id]
-            );
-
-            if (latest.coin_balance < rate) {
-              await conn2.execute(
-                `UPDATE call_sessions 
-                 SET status='ENDED', ended_at=NOW() 
-                 WHERE session_id=?`,
-                [session_id]
-              );
-
-              stopLiveBilling(session_id);
-              warnedSessions.delete(session_id);
-
-              io?.to(`call:${session_id}`).emit(
-                "call_insufficient_balance"
-              );
-            }
-
-            await conn2.commit();
-          } catch (e) {
-            await conn2.rollback();
-          } finally {
-            conn2.release();
-          }
-        }, 10_000);
+        io?.to(`video_call:${session_id}`).emit("low_balance_warning", {
+          remainingCoins: male.coin_balance,
+          secondsLeft: 60,
+        });
       }
 
-    
-      if (caller.coin_balance < rate) {
-        await conn.rollback();
+      /* ============================
+         NOT ENOUGH BALANCE
+      ============================ */
+
+      if (male.coin_balance < rate) {
+
+        await conn.execute(
+          `UPDATE call_sessions
+           SET status='ENDED', ended_at=NOW()
+           WHERE session_id=?`,
+          [session_id]
+        );
+
+        await conn.commit();
+
         stopLiveBilling(session_id);
         warnedSessions.delete(session_id);
+
+        io?.to(`call:${session_id}`).emit("call_insufficient_balance");
+        io?.to(`video_call:${session_id}`).emit("call_insufficient_balance");
+
         return;
       }
 
-      
+      /* ============================
+         DEDUCT FROM MALE
+      ============================ */
+
       await CoinModel.updateUserBalance(
-        session.caller_id,
+        session.receiver_id,
         -rate,
         conn
       );
 
       await CoinModel.insertTransaction(
-        session.caller_id,        
-        session.receiver_id,      
+        session.receiver_id,     // male
+        session.caller_id,       // female
         session_id,
         session.type,
         rate,
@@ -114,47 +120,113 @@ function startLiveBilling(session_id, io) {
         conn
       );
 
-      
-      await CoinModel.updateUserBalance(
-        session.receiver_id,
-        rate,
-        conn
-      );
+      /* ============================
+         LIVE MALE REMAINING MINUTES
+      ============================ */
 
-      await CoinModel.insertTransaction(
-        session.receiver_id,     
-        session.caller_id,        
-        session_id,
-        session.type,
-        rate,
-        "CREDIT",
-        "CALL",
-        conn
-      );
+      const remainingCoins = male.coin_balance - rate;
+      const remainingMinutes = Math.floor(remainingCoins / rate);
+
+      io?.to(`call:${session_id}`).emit("male_minutes_update", {
+        remainingCoins,
+        remainingMinutes,
+        ratePerMinute: rate
+      });
+
+      io?.to(`video_call:${session_id}`).emit("male_minutes_update", {
+        remainingCoins,
+        remainingMinutes,
+        ratePerMinute: rate
+      });
+
+      /* ============================
+         FEMALE RING LOGIC
+         5 min = 1 ring
+      ============================ */
+
+      const prevSeconds = femaleSeconds.get(session_id) || 0;
+      const newSeconds = prevSeconds + 60;
+
+      femaleSeconds.set(session_id, newSeconds);
+
+      const prevRings = Math.floor(prevSeconds / 300);
+      const newRings  = Math.floor(newSeconds / 300);
+
+      const ringsToAdd = newRings - prevRings;
+
+      /* ============================
+         LIVE FEMALE RINGS UPDATE
+      ============================ */
+
+      io?.to(`call:${session_id}`).emit("female_rings_update", {
+        totalRings: newRings,
+        secondsTalked: newSeconds
+      });
+
+      io?.to(`video_call:${session_id}`).emit("female_rings_update", {
+        totalRings: newRings,
+        secondsTalked: newSeconds
+      });
+
+      if (ringsToAdd > 0) {
+
+        await CoinModel.updateUserBalance(
+          session.caller_id,   // female
+          ringsToAdd,
+          conn
+        );
+
+        await CoinModel.insertTransaction(
+          session.caller_id,
+          session.receiver_id,
+          session_id,
+          session.type,
+          ringsToAdd,
+          "CREDIT",
+          "RING_EARN",
+          conn
+        );
+      }
 
       await conn.commit();
+
     } catch (err) {
+
       await conn.rollback();
       console.error("❌ Live billing error:", err.message);
+
     } finally {
       conn.release();
     }
-  }, 60_000); 
+
+  }, 60_000); // 1 minute
 
   activeIntervals.set(session_id, interval);
 }
 
 
+/* ============================
+   STOP BILLING
+============================ */
+
 function stopLiveBilling(session_id) {
+
   if (activeIntervals.has(session_id)) {
     clearInterval(activeIntervals.get(session_id));
     activeIntervals.delete(session_id);
   }
+
   warnedSessions.delete(session_id);
+  femaleSeconds.delete(session_id);
 }
 
 
+/* ============================
+   FINALIZE SESSION
+============================ */
+
 async function finalizeOnHangup(session_id) {
+
   const conn = await db.getConnection();
 
   try {
@@ -195,9 +267,12 @@ async function finalizeOnHangup(session_id) {
     );
 
     await conn.commit();
+
   } catch (err) {
+
     await conn.rollback();
     throw err;
+
   } finally {
     conn.release();
   }

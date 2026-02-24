@@ -51,18 +51,42 @@ const markOffline = async (user_id) => {
 };
 
 
-const findByMobileAndOtp= async (mobile_number, otp) => {
-    const [rows] =await db.execute('SELECT * from user WHERE mobile_number=? AND otp=?',
-        [mobile_number, otp]
-    )
-    return rows[0]
-}
+// const findByMobileAndOtp= async (mobile_number, otp) => {
+//     const [rows] =await db.execute('SELECT * from user WHERE mobile_number=? AND otp=?',
+//         [mobile_number, otp]
+//     )
+//     return rows[0]
+// }
+
+// const createOrUpdateOtp = async (mobile_number, otp) => {
+//     await db.execute('INSERT INTO user (mobile_number, otp) VALUES (?, ?) ON DUPLICATE KEY UPDATE otp=?',
+//         [mobile_number, otp, otp]
+//     )
+// }
+
+const findByMobileAndOtp = async (mobile_number, otp) => {
+  const [rows] = await db.execute(
+    `SELECT * FROM user 
+     WHERE mobile_number = ? 
+     AND otp = ?
+     AND otp_expires_at > NOW()`,
+    [mobile_number, otp]
+  );
+
+  return rows[0];
+};
+
 
 const createOrUpdateOtp = async (mobile_number, otp) => {
-    await db.execute('INSERT INTO user (mobile_number, otp) VALUES (?, ?) ON DUPLICATE KEY UPDATE otp=?',
-        [mobile_number, otp, otp]
-    )
-}
+  await db.execute(
+    `INSERT INTO user (mobile_number, otp, otp_expires_at)
+     VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 15 SECOND))
+     ON DUPLICATE KEY UPDATE 
+       otp = VALUES(otp),
+       otp_expires_at = DATE_ADD(NOW(), INTERVAL 15 SECOND)`,
+    [mobile_number, otp]
+  );
+};
 
 const clearOtp = async (mobile_number) => {
     await db.execute('UPDATE user SET otp=NULL WHERE mobile_number=?',

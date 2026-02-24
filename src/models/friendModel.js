@@ -142,13 +142,20 @@ const status = async (me, other) => {
 
   const row = rows[0];
 
+  // ✅ FRIEND
   if (row.status === "ACCEPTED") {
     return { state: "FRIEND" };
   }
 
-  return row.requested_by === me
-    ? { state: "PENDING_SENT" }
-    : { state: "PENDING_RECEIVED", request_id: row.id };
+  // ✅ ONLY treat PENDING as pending
+  if (row.status === "PENDING") {
+    return row.requested_by === me
+      ? { state: "PENDING_SENT" }
+      : { state: "PENDING_RECEIVED", request_id: row.id };
+  }
+
+  // ✅ Everything else = NONE
+  return { state: "NONE" };
 };
 
 
@@ -157,11 +164,14 @@ const remove = async (me, other) => {
   const { u1, u2 } = normalize(me, other);
 
   await db.execute(
-    `DELETE FROM friends WHERE user_id_1=? AND user_id_2=?`,
+    `
+    DELETE FROM friends
+    WHERE user_id_1=? AND user_id_2=?
+      AND status='ACCEPTED'
+    `,
     [u1, u2]
   );
 };
-
 
 /* ================= LIST BY STATUS ================= */
 const listByStatus = async (userId, status = "ACCEPTED") => {
@@ -225,6 +235,55 @@ const adminList = async (status = "ALL") => {
   return rows;
 };
 
+const isFriend = async (userId, friendId) => {
+
+  const [rows] = await db.execute(
+    `
+    SELECT id
+    FROM friends
+    WHERE
+      (
+        (user_id_1 = ? AND user_id_2 = ?)
+        OR
+        (user_id_1 = ? AND user_id_2 = ?)
+      )
+      AND status = 'ACCEPTED'
+    LIMIT 1
+    `,
+    [userId, friendId, friendId, userId]
+  );
+
+  return rows.length > 0;
+};
+
+
+const getPendingRequest = async (senderId, receiverId) => {
+  const [rows] = await db.execute(
+    `
+    SELECT id
+    FROM friends
+    WHERE status='PENDING'
+      AND requested_by=?
+      AND (user_id_1=? OR user_id_2=?)
+    `,
+    [senderId, receiverId, receiverId]
+  );
+
+  return rows[0];
+};
+
+const reject = async (senderId, receiverId) => {
+  const { u1, u2 } = normalize(senderId, receiverId);
+
+  await db.execute(
+    `
+    DELETE FROM friends
+    WHERE user_id_1=? AND user_id_2=?
+      AND status='PENDING'
+    `,
+    [u1, u2]
+  );
+};
 /* ================= EXPORTS ================= */
 module.exports = {
   find,
@@ -236,4 +295,7 @@ module.exports = {
   remove,
   listByStatus,
   adminList,
+  isFriend,
+  getPendingRequest,
+  reject,
 };
