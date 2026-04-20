@@ -72,8 +72,23 @@ const updateUserBalance = async (user_id, amount, conn) => {
   await conn.execute(sql, [amount, user_id]);
 };
 
+/* ======================================================
+   💎 UPDATE USER RINGS BALANCE
+====================================================== */
+const updateUserRingsBalance = async (user_id, amount, conn) => {
+  const sql = `
+    UPDATE user
+    SET rings_balance = rings_balance + ?,
+        updates_at = NOW()
+    WHERE user_id = ?
+  `;
+
+  await conn.execute(sql, [amount, user_id]);
+};
+
 module.exports = {
   insertTransaction,
   getUserBalanceForUpdate,
   updateUserBalance,
+  updateUserRingsBalance,
 };

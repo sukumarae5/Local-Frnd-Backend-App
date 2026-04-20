@@ -108,3 +108,29 @@ exports.getHistoryWithUser = async (userId, otherUserId) => {
   );
   return rows;
 };
+
+exports.getAllCallHistory = async () => {
+  const query = `
+    SELECT *
+    FROM call_sessions
+    ORDER BY created_at DESC
+  `;
+
+  const [rows] = await db.execute(query);
+  return rows;
+};
+
+exports.getUserCallHistory = async (userId) => {
+
+  const query = `
+    SELECT *
+    FROM call_sessions
+    WHERE caller_id = ? OR receiver_id = ?
+    ORDER BY created_at DESC
+  `;
+
+  const [rows] = await db.execute(query, [userId, userId]);
+
+  return rows;
+};
+ 

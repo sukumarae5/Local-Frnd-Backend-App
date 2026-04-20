@@ -2,6 +2,7 @@ const authService = require("../services/authServices");
 
 // Register new user
 exports.registerUser = async (req, res) => {
+   console.log("BODY:", req.body);
   try {
     const { mobile_number } = req.body;
     if (!mobile_number)

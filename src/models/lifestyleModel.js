@@ -8,10 +8,10 @@ const create = async (category_id, name) => {
   return result.insertId;
 };
 
-const update = async (id, name) => {
+const update = async (id, category_id, name) => {
   const [result] = await db.query(
-    "UPDATE lifestyles SET name = ? WHERE id = ?",
-    [name, id]
+    "UPDATE lifestyles SET name = ?, category_id = ? WHERE id = ?",
+    [name, category_id, id]
   );
   return result.affectedRows;
 };

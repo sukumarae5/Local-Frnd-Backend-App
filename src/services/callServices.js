@@ -4,6 +4,40 @@ const callModel = require("../models/callModel");
 const friendModel = require("../models/friendModel");
 
 
+// const startFemaleSearch = async (female_id, type) => {
+//   const conn = await db.getConnection();
+
+//   try {
+//     await conn.beginTransaction();
+
+//     await callModel.cancelFemaleSearchTx(conn, female_id);
+
+//     await callModel.forceEndConnectedByUserTx(conn, female_id);
+
+
+
+//     const session_id = "SEARCH_" + uuidv4();
+
+//     await callModel.createFemaleSearchSession(
+//       conn,
+//       session_id,
+//       female_id,
+//       type
+//     );
+
+//     await conn.commit();
+//     return session_id;
+
+//   } catch (err) {
+//     await conn.rollback();
+//     throw err;
+//   } finally {
+//     conn.release();
+//   }
+// };
+
+
+
 const startFemaleSearch = async (female_id, type) => {
   const conn = await db.getConnection();
 
@@ -11,10 +45,57 @@ const startFemaleSearch = async (female_id, type) => {
     await conn.beginTransaction();
 
     await callModel.cancelFemaleSearchTx(conn, female_id);
-
     await callModel.forceEndConnectedByUserTx(conn, female_id);
 
+    /* =====================================================
+       🔥 STEP 1: CHECK WAITING MALE (ADD HERE)
+    ===================================================== */
 
+    const [waitingMale] = await conn.execute(`
+      SELECT * FROM call_sessions
+      WHERE status = 'WAITING'
+        AND type = ?
+      LIMIT 1
+      FOR UPDATE
+    `, [type]);
+
+    if (waitingMale.length > 0) {
+      const male = waitingMale[0];
+
+      // ✅ CONNECT DIRECTLY
+      await conn.execute(`
+        UPDATE call_sessions
+        SET receiver_id = ?,
+            status = 'CONNECTED',
+            started_at = NOW(),
+            updated_at = NOW()
+        WHERE session_id = ?
+      `, [female_id, male.session_id]);
+
+      await conn.commit();
+
+      // 🔥 EMIT SOCKET
+      const { getIO } = require("../socket");
+      const io = getIO();
+
+      io.to(String(male.caller_id)).emit("call_accepted", {
+        session_id: male.session_id,
+        call_type: type,
+        call_mode: "RANDOM"
+      });
+
+      io.to(String(female_id)).emit("call_accepted", {
+        session_id: male.session_id,
+        call_type: type,
+        call_mode: "RANDOM"
+      });
+
+      return male.session_id;
+    }
+
+    /* =====================================================
+       🔥 STEP 2: NORMAL FLOW (IF NO MALE FOUND)
+    ===================================================== */
 
     const session_id = "SEARCH_" + uuidv4();
 
@@ -26,6 +107,7 @@ const startFemaleSearch = async (female_id, type) => {
     );
 
     await conn.commit();
+
     return session_id;
 
   } catch (err) {
@@ -35,6 +117,7 @@ const startFemaleSearch = async (female_id, type) => {
     conn.release();
   }
 };
+
 
 const randomMatchMale = async (male_id, type) => {
   console.log("Attempting random match for male:", male_id, type);
@@ -247,7 +330,9 @@ const getSessionById = async (session_id) => {
 
   return rows[0] || null;
 };
-
+const cancelMaleWaiting = async (user_id) => {
+  return await callModel.cancelMaleWaiting(user_id);
+};
 
 module.exports = {
   startFemaleSearch,
@@ -259,5 +344,6 @@ module.exports = {
   friendConnect,
   getSessionUsers,
   connectSession,
-  getSessionById
+  getSessionById,
+  cancelMaleWaiting
 };

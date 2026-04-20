@@ -39,9 +39,7 @@ const isProfileComplete = async (user_id) => {
       user.mobile_number &&
       user.date_of_birth &&
       user.gender &&
-      user.language_id &&
-      user.location_lat &&
-      user.location_log
+      user.language_id
   );
 };
 
@@ -221,7 +219,8 @@ console.log("Rewarded:", rewarded);
     return {
       success: true,
       message: "Profile verified successfully",
-      reward: 50
+      // reward: 50
+      reward: rewarded
     };
   }
 
@@ -389,7 +388,8 @@ const updateProfile = async (user_id, data) => {
     return {
       success: true,
       message: "Profile verified successfully",
-      reward: 50
+      // reward: 50
+      reward: rewarded
     };
   }
 

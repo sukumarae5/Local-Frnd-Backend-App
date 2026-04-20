@@ -149,8 +149,11 @@ function startLiveBilling(session_id, io) {
 
       femaleSeconds.set(session_id, newSeconds);
 
-      const prevRings = Math.floor(prevSeconds / 300);
-      const newRings  = Math.floor(newSeconds / 300);
+      // const prevRings = Math.floor(prevSeconds / 300);
+      // const newRings  = Math.floor(newSeconds / 300);
+
+      const prevRings = Math.floor(prevSeconds / 60);
+const newRings  = Math.floor(newSeconds / 60);
 
       const ringsToAdd = newRings - prevRings;
 
@@ -170,30 +173,30 @@ function startLiveBilling(session_id, io) {
 
       if (ringsToAdd > 0) {
 
-        await CoinModel.updateUserBalance(
-          session.caller_id,   // female
-          ringsToAdd,
-          conn
-        );
+  await CoinModel.updateUserRingsBalance(   // ✅ NEW FUNCTION
+    session.caller_id,
+    ringsToAdd,
+    conn
+  );
 
-        await CoinModel.insertTransaction(
-          session.caller_id,
-          session.receiver_id,
-          session_id,
-          session.type,
-          ringsToAdd,
-          "CREDIT",
-          "RING_EARN",
-          conn
-        );
-      }
+  await CoinModel.insertTransaction(
+    session.caller_id,
+    session.receiver_id,
+    session_id,
+    session.type,
+    ringsToAdd,
+    "CREDIT",
+    "RING_EARN",
+    conn
+  );
+}
 
       await conn.commit();
 
     } catch (err) {
 
       await conn.rollback();
-      console.error("❌ Live billing error:", err.message);
+      console.error("❌ Live billing error:", err);
 
     } finally {
       conn.release();

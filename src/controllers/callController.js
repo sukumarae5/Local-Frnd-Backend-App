@@ -2,7 +2,8 @@ const callService = require("../services/callServices");
 const callModel = require("../models/callModel");
 const { getIO } = require("../socket");
 const socketMap = require("../socket/socketMap");
-
+const notificationService = require("../services/notificationService");
+const db = require("../config/db");
 
 const startSearch = async (req, res) => {
   console.log("Starting search for user:", req.user);
@@ -32,10 +33,37 @@ const startSearch = async (req, res) => {
 };
 
 
+// const searchingFemales = async (req, res) => {
+//   const data = await callModel.getSearchingFemales();
+//   console.log("Searching females data:", data); 
+//   res.json({ success: true, data });
+// };
+
+
 const searchingFemales = async (req, res) => {
-  const data = await callModel.getSearchingFemales();
-  console.log("Searching females data:", data); 
-  res.json({ success: true, data });
+  try {
+
+    const filters = {
+      online: req.query.online,
+      type: req.query.type,
+      language: req.query.language,
+      country_id: req.query.country_id,
+      state_id: req.query.state_id,
+      city_id: req.query.city_id,
+      interest_id: req.query.interest_id
+    };
+
+    const females = await callModel.getSearchingFemales(filters);
+
+    res.json({
+      success: true,
+      data: females
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
 };
 
 
@@ -54,22 +82,45 @@ const randomConnect = async (req, res) => {
       call_type
     );
 
+    // if (!session) {
+    //   return res.json({
+    //     status: "NO_MATCH",
+    //     message: "No female users currently searching"
+    //   });
+    // }
+
     if (!session) {
-      return res.json({
-        status: "NO_MATCH",
-        message: "No female users currently searching"
-      });
-    }
+
+  const waitingSessionId = "WAIT_" + Date.now();
+
+  // 🔥 STEP 1: REMOVE OLD WAITING (ADD HERE)
+  await db.execute(`
+    DELETE FROM call_sessions 
+    WHERE caller_id = ? AND status = 'WAITING'
+  `, [req.user.user_id]);
+
+  // 🔥 STEP 2: INSERT NEW WAITING
+  await db.execute(`
+    INSERT INTO call_sessions
+    (session_id, caller_id, receiver_id, status, type, created_at, updated_at)
+    VALUES (?, ?, NULL, 'WAITING', ?, NOW(), NOW())
+  `, [waitingSessionId, req.user.user_id, call_type]);
+
+  return res.json({
+    status: "NO_MATCH"
+  });
+}
 
     const io = getIO();
 io.to(String(session.caller_id)).emit("incoming_call", {
   session_id: session.session_id,
   from: req.user.user_id,
   call_type,
-  status: "RINGING"
+  status: "ACCEPTED",
+  call_mode: "RANDOM"
 });
     res.json({
-      status: "RINGING",
+      status: "ACCEPTED",
       session_id: session.session_id,
       call_type
     });
@@ -108,11 +159,12 @@ const directConnect = async (req, res) => {
       session_id: session.session_id,
       from: req.user.user_id,
       call_type,
-      
+      status: "ACCEPTED",
+  call_mode: "DIRECT"
     });
 
     res.json({
-      status: "RINGING",
+      status: "ACCEPTED",
       session_id: session.session_id,
       call_type
     });
@@ -186,81 +238,88 @@ console.log("Connected call details:", row);
   }
 };
 
-// const friendConnect = async (req, res) => {
-// console.log("Friend connect request:",  req.body);
-//   try {
-
-//     const { friend_id, call_type } = req.body;
-// console.log("Friend connect request:", req.user, friend_id, call_type); 
-//     const session = await callService.friendConnect(
-//       req.user.user_id,
-//       friend_id,
-//       call_type
-//     );
-// console.log("Friend connect session:", session);
-//     console.log("fghjkl", socketMap)
-//     if (!socketMap.isOnline(String(friend_id))) {
-//       return res.json({ status: "USER_OFFLINE" });
-//     }
-
-//     const io = getIO();
-
-//     io.to(String(friend_id)).emit("incoming_call", {
-//       session_id: session.session_id,
-//       from: req.user.user_id,
-//       call_type,
-//       status: "RINGING",
-//       is_friend: true
-//     });
-
-//     return res.json({
-//       status: "RINGING",
-//       session_id: session.session_id
-//     });
-
-//   } catch (err) {
-
-//     if (err.message === "USER_BUSY") {
-//       return res.json({ status: "BUSY" });
-//     }
-
-//     if (err.message === "FRIEND_BUSY") {
-//       return res.json({ status: "BUSY" });
-//     }
-
-//     if (err.message === "NOT_FRIEND") {
-//       return res.status(403).json({ error: "Not friends" });
-//     }
-
-//     return res.status(400).json({ error: err.message });
-//   }
-// };
 
 const friendConnect = async (req, res) => {
-
+  console.log("Friend connect request:", req.user, req.body); 
   try {
-
     const { friend_id, call_type } = req.body;
+    const caller_id = req.user.user_id;
 
+    const io = getIO();
+
+    /* ===============================
+       1️⃣ CHECK ONLINE FIRST
+    =============================== */
+    if (!socketMap.isOnline(String(friend_id))) {
+
+      await notificationService.createNotification(
+        caller_id,
+        friend_id,
+        "MISSED_CALL",
+        `Missed ${call_type.toLowerCase()} call`,
+        {
+          call_type,
+          session_id: null
+        }
+      );
+
+      io.to(String(friend_id)).emit("new_notification");
+
+      return res.json({ status: "USER_OFFLINE" });
+    }
+
+    /* ===============================
+       2️⃣ CREATE SESSION
+    =============================== */
     const session = await callService.friendConnect(
-      req.user.user_id,
+      caller_id,
       friend_id,
       call_type
     );
 
-    if (!socketMap.isOnline(String(friend_id))) {
-      return res.json({ status: "USER_OFFLINE" });
-    }
-
-    const io = getIO();
-
+    /* ===============================
+       3️⃣ EMIT INCOMING CALL
+    =============================== */
     io.to(String(friend_id)).emit("incoming_call", {
       session_id: session.session_id,
-      from: req.user.user_id,
-      call_type: session.type,   // safer
+      from: caller_id,
+      call_type: session.type,
       status: "RINGING",
-      is_friend: true
+      is_friend: true,
+      call_mode: "FRIEND"
     });
+
+    /* ===============================
+       4️⃣ RING TIMEOUT (30 sec)
+    =============================== */
+    const timeout = setTimeout(async () => {
+
+      const full = await callService.getSessionById(session.session_id);
+      if (!full) return;
+
+      if (full.status === "RINGING") {
+
+        await callService.endSession(session.session_id);
+
+        await notificationService.createNotification(
+          caller_id,
+          friend_id,
+          "MISSED_CALL",
+          `Missed ${session.type.toLowerCase()} call`,
+          {
+            call_type: session.type,
+            session_id: session.session_id
+          }
+        );
+
+        io.to(String(friend_id)).emit("new_notification");
+
+        io.to(String(caller_id)).emit("call_timeout", {
+          session_id: session.session_id
+        });
+      }
+
+    }, 30000);
 
     return res.json({
       status: "RINGING",
@@ -276,6 +335,20 @@ const friendConnect = async (req, res) => {
     }
 
     if (err.message === "FRIEND_BUSY") {
+
+      await notificationService.createNotification(
+        req.user.user_id,
+        friend_id,
+        "MISSED_CALL",
+        `Missed ${call_type.toLowerCase()} call`,
+        {
+          call_type,
+          session_id: null
+        }
+      );
+
+      getIO().to(String(friend_id)).emit("new_notification");
+
       return res.json({ status: "BUSY" });
     }
 
@@ -287,8 +360,21 @@ const friendConnect = async (req, res) => {
   }
 };
 
+const cancelMaleWaiting = async (req, res) => {
+  try {
 
+    await callService.cancelMaleWaiting(req.user.user_id);
 
+    res.json({
+      success: true,
+      message: "Waiting cancelled"
+    });
+
+  } catch (err) {
+    console.error("cancelMaleWaiting error:", err.message);
+    res.status(400).json({ error: err.message });
+  }
+};
 module.exports = {
   startSearch,
   searchingFemales,
@@ -296,5 +382,6 @@ module.exports = {
   directConnect,
   cancelSearch,
   getConnectedCallDetails,
-  friendConnect
+  friendConnect,
+  cancelMaleWaiting
 };

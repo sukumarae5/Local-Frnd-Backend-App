@@ -12,14 +12,20 @@ const add = async (req, res) => {
 };
 
 const update = async (req, res) => {
+  console.log("Updating lifestyle with ID:", req.params.id);  
+  console.log("Request body:", req.body);
   try {
-    await Service.updateLifestyle(req.params.id, req.body.name);
+    const id = req.params.id;
+    const { category_id, name } = req.body;
+
+    await Service.updateLifestyle(id, category_id, name);
+
     res.json({ success: true, message: "Lifestyle updated" });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
   }
 };
-
+ 
 const remove = async (req, res) => {
   try {
     await Service.deleteLifestyle(req.params.id);

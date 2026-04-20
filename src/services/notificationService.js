@@ -1,9 +1,20 @@
-
-
 const Notification = require("../models/notificationModel");
 
-const createNotification = async (sender, receiver, type, message) => {
-  return await Notification.create(sender, receiver, type, message);
+const createNotification = async (
+  sender,
+  receiver,
+  type,
+  message,
+  meta = {}
+) => {
+  return await Notification.create(
+    sender,
+    receiver,
+    type,
+    message,
+    meta.call_type || null,
+    meta.session_id || null
+  );
 };
 
 const getNotifications = async (userId) => {

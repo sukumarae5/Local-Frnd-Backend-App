@@ -50,6 +50,7 @@ const findSearchingFemaleLocked = async (conn, type) => {
     WHERE cs.status = 'SEARCHING'
       AND cs.type = ?
       AND u.gender = 'Female'
+         
     ORDER BY cs.created_at DESC
     LIMIT 1
     FOR UPDATE
@@ -162,22 +163,113 @@ const endSession = async (session_id) => {
 };
 
 
-const getSearchingFemales = async () => {
-  const [rows] = await db.execute(
-    `
+// const getSearchingFemales = async () => {
+//   const [rows] = await db.execute(
+//     `
+//     SELECT
+//       cs.session_id,
+//       cs.type,
+//       u.user_id
+//     FROM call_sessions cs
+//     JOIN user u ON u.user_id = cs.caller_id
+//     WHERE cs.status = 'SEARCHING'
+//       AND u.gender = 'Female'
+//        AND u.is_online = 1
+//     ORDER BY cs.created_at DESC
+//     `
+//   );
+// console.log("getSearchingFemales - rows:", rows); 
+//   return rows;
+// };
+
+
+const getSearchingFemales = async (filters = {}) => {
+
+  let sql = `
     SELECT
       cs.session_id,
       cs.type,
-      u.user_id
+      u.user_id,
+      u.name,
+      u.language_id,
+      u.country_id,
+      u.state_id,
+      u.city_id,
+      u.is_online
     FROM call_sessions cs
-    JOIN user u ON u.user_id = cs.caller_id
-    WHERE cs.status = 'SEARCHING'
-      AND u.gender = 'Female'
-       AND u.is_online = 1
-    ORDER BY cs.created_at DESC
-    `
-  );
-console.log("getSearchingFemales - rows:", rows); 
+    JOIN user u 
+      ON u.user_id = cs.caller_id
+  `;
+
+  const params = [];
+  const conditions = [];
+
+  /* base conditions */
+
+  conditions.push(`cs.status = 'SEARCHING'`);
+  conditions.push(`u.gender = 'Female'`);
+
+  /* online filter */
+
+  if (filters.online) {
+    conditions.push(`u.is_online = ?`);
+    params.push(filters.online);
+  }
+
+  /* audio/video filter */
+
+  if (filters.type) {
+    conditions.push(`cs.type = ?`);
+    params.push(filters.type);
+  }
+
+  /* language filter */
+
+  if (filters.language) {
+    conditions.push(`u.language_id = ?`);
+    params.push(filters.language);
+  }
+
+  /* country filter */
+
+  if (filters.country_id) {
+    conditions.push(`u.country_id = ?`);
+    params.push(filters.country_id);
+  }
+
+  /* state filter */
+
+  if (filters.state_id) {
+    conditions.push(`u.state_id = ?`);
+    params.push(filters.state_id);
+  }
+
+  /* city filter */
+
+  if (filters.city_id) {
+    conditions.push(`u.city_id = ?`);
+    params.push(filters.city_id);
+  }
+
+  /* interest filter */
+
+  if (filters.interest_id) {
+
+    sql += `
+      JOIN user_interests ui 
+      ON ui.user_id = u.user_id
+    `;
+
+    conditions.push(`ui.interest_id = ?`);
+    params.push(filters.interest_id);
+  }
+
+  sql += ` WHERE ` + conditions.join(" AND ");
+
+  sql += ` ORDER BY cs.created_at DESC`;
+
+  const [rows] = await db.execute(sql, params);
+
   return rows;
 };
 
@@ -333,7 +425,13 @@ const connectSession = async (session_id) => {
   return result;
 };
 
-
+const cancelMaleWaiting = async (user_id) => {
+  await db.execute(`
+    DELETE FROM call_sessions
+    WHERE caller_id = ?
+    AND status = 'WAITING'
+  `, [user_id]);
+};
 
 
 module.exports = {
@@ -351,5 +449,6 @@ module.exports = {
   forceEndConnectedByUserTx,
   createFriendSession,
   getSessionUsers,
-  connectSession
+  connectSession,
+    cancelMaleWaiting
 };

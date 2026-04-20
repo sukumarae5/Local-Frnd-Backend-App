@@ -11,39 +11,71 @@ const connectedSessions = new Set();
 module.exports = (socket, io) => {
   const userId = String(socket.user.user_id);
 
-  socket.on("audio_join", async ({ session_id }) => {
-    const room = `call:${session_id}`;
-    socket.join(room);
- socket.session_id = session_id;
-    if (!joinedUsers.has(session_id)) {
-      joinedUsers.set(session_id, new Set());
-    }
+//   socket.on("audio_join", async ({ session_id }) => {
+//    const room = `call:${session_id}`;
+// socket.join(room);
 
-    // ⛔ Prevent duplicate join
-    if (joinedUsers.get(session_id).has(userId)) return;
+// socket.session_id = session_id;
 
-    joinedUsers.get(session_id).add(userId);
+// // 🔥 ADD DELAY TO FIX RACE CONDITION
+//   const roomSize = io.sockets.adapter.rooms.get(room)?.size || 0;
 
-    const roomSize = io.sockets.adapter.rooms.get(room)?.size || 0;
+//   console.log("📞 audio_join AFTER DELAY", { session_id, roomSize });
 
-    console.log("📞 audio_join", { session_id, userId, roomSize });
+//   if (roomSize === 2 && !connectedSessions.has(session_id)) {
+//     connectedSessions.add(session_id);
 
-    // 🔥 Emit ONCE
-    if (roomSize === 2 && !connectedSessions.has(session_id)) {
-      connectedSessions.add(session_id);
+//     try {
+//       await CallService.connectSession(session_id);
+//       coinService.startLiveBilling(session_id, io);
+//     } catch (err) {
+//       console.error("⚠️ connectSession:", err.message);
+//     }
 
-      try {
-        await CallService.connectSession(session_id);
+//     io.to(room).emit("audio_connected");
+//   }
+//  socket.session_id = session_id;
+//     if (!joinedUsers.has(session_id)) {
+//       joinedUsers.set(session_id, new Set());
+//     }
 
-        coinService.startLiveBilling(session_id, io);
-      } catch (err) {
-        console.error("⚠️ connectSession:", err.message);
-      }
+//     // ⛔ Prevent duplicate join
+//     if (joinedUsers.get(session_id).has(userId)) return;
 
-      io.to(room).emit("audio_connected");
-    }
-  });
+//     joinedUsers.get(session_id).add(userId);
 
+//     // const roomSize = io.sockets.adapter.rooms.get(room)?.size || 0;
+
+//     console.log("📞 audio_join", { session_id, userId, roomSize });
+
+//   });
+
+
+
+
+socket.on("audio_join", async ({ session_id }) => {
+  const room = `call:${session_id}`;
+  socket.join(room);
+
+  socket.session_id = session_id;
+
+  const roomUsers = io.sockets.adapter.rooms.get(room);
+
+  const roomSize = roomUsers ? roomUsers.size : 0;
+
+  console.log("📞 audio_join", { session_id, roomSize });
+
+  // ✅ ONLY TRIGGER WHEN BOTH JOINED
+  if (roomSize === 2 && !connectedSessions.has(session_id)) {
+    connectedSessions.add(session_id);
+
+    await CallService.connectSession(session_id);
+
+    console.log("🚀 EMITTING audio_connected");
+
+    io.to(room).emit("audio_connected");
+  }
+});
   /* ================= HEARTBEAT ================= */
   socket.on("audio_ping", ({ session_id }) => {
     heartbeats.set(session_id, Date.now());
@@ -58,9 +90,17 @@ module.exports = (socket, io) => {
     socket.to(`call:${session_id}`).emit("audio_answer", { answer });
   });
 
-  socket.on("audio_ice_candidate", ({ session_id, candidate }) => {
-    socket.to(`call:${session_id}`).emit("audio_ice_candidate", { candidate });
-  });
+socket.on("audio_ice_candidate", ({ session_id, candidate }) => {
+  console.log("📥 ICE from", socket.id);
+
+  const room = `call:${session_id}`;
+  console.log("📡 SERVER RELAY ICE:", candidate);
+  const roomUsers = io.sockets.adapter.rooms.get(room);
+
+  console.log("👥 Room users:", roomUsers);
+
+  io.to(room).emit("audio_ice_candidate", { candidate });
+});
 
   /* ================= HANGUP ================= */
   socket.on("audio_call_hangup", async ({ session_id }) => {

@@ -5,8 +5,13 @@ const addLifestyle = async (category_id, name) => {
   return await Model.create(category_id, name);
 };
 
-const updateLifestyle = async (id, name) => {
-  const affected = await Model.update(id, name);
+const updateLifestyle = async (id, category_id, name) => {
+  if (!id || !category_id || !name) {
+    throw new Error("id, category_id and name are required");
+  }
+
+  const affected = await Model.update(id, category_id, name);
+
   if (!affected) throw new Error("Lifestyle not found");
 };
 

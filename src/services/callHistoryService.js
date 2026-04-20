@@ -11,3 +11,25 @@ exports.recentUsers = async (userId) => {
 exports.withUser = async (userId, otherUserId) => {
   return await historyModel.getHistoryWithUser(userId, otherUserId);
 };
+
+exports.fetchAllCallHistory = async () => {
+  const calls = await historyModel.getAllCallHistory();
+
+  return {
+    success: true,
+    total: calls.length,
+    data: calls
+  };
+};
+
+exports.fetchUserCallHistory = async (userId) => {
+
+  const calls = await historyModel.getUserCallHistory(userId);
+
+  return {
+    success: true,
+    totalCalls: calls.length,
+    data: calls
+  };
+
+};
