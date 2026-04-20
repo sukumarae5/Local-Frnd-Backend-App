@@ -1,108 +1,9 @@
-// const audioCallHandler = require("./audioCall");
-// const videoCallHandler = require("./videoCall");
-// const CallService = require("../services/callServices");
 
-// module.exports = (socket, io) => {
-
-//   const myUserId = String(socket.user.user_id);
-
-//   /* =============================
-//      CALL ACCEPT
-//   ============================== */
-
-// socket.on("call_accept", async ({ session_id }) => {
-
-//   console.log("✅ call_accept by", myUserId, session_id);
-
-//   try {
-
-//     const session =
-//       await CallService.getSessionUsers(session_id);
-
-//     if (!session) return;
-
-//     const full =
-//       await CallService.getSessionById(session_id);
-
-//     const { caller_id, receiver_id } = session;
-
-//     if (
-//       String(caller_id) !== myUserId &&
-//       String(receiver_id) !== myUserId
-//     ) {
-//       return;
-//     }
-
-//     io.to(String(caller_id)).emit("call_accepted", {
-//       session_id,
-//       call_type: full.type
-//     });
-
-//     io.to(String(receiver_id)).emit("call_accepted", {
-//       session_id,
-//       call_type: full.type
-//     });
-
-//   } catch (err) {
-//     console.log("call_accept error:", err.message);
-//   }
-// });
-
-//   /* =============================
-//      CALL REJECT
-//   ============================== */
-
-//   socket.on("call_reject", async ({ session_id }) => {
-
-//     console.log("❌ call_reject by", myUserId, session_id);
-
-//     try {
-
-//       const session =
-//         await CallService.getSessionUsers(session_id);
-
-//       if (!session) return;
-
-//       const { caller_id, receiver_id } = session;
-
-//       // only participants can reject
-//       if (
-//         String(caller_id) !== myUserId &&
-//         String(receiver_id) !== myUserId
-//       ) {
-//         return;
-//       }
-
-//       await CallService.endSession(session_id);
-
-//       io.to(String(caller_id)).emit("call_rejected", {
-//         session_id
-//       });
-
-//       io.to(String(receiver_id)).emit("call_rejected", {
-//         session_id
-//       });
-
-//     } catch (err) {
-//       console.log("call_reject error:", err.message);
-//     }
-//   });
-
-
-//   /* =============================
-//      EXISTING HANDLERS
-//   ============================== */
-
-//   audioCallHandler(socket, io);
-//   videoCallHandler(socket, io);
-// };
-
-
-// callSocket.js
 
 const audioCallHandler = require("./audioCall");
 const videoCallHandler = require("./videoCall");
 const CallService = require("../services/callServices");
+const notificationService = require("../services/notificationService");
 
 module.exports = (socket, io) => {
 
@@ -134,26 +35,37 @@ module.exports = (socket, io) => {
         return;
       }
 
-      // ✅ very important guard
-      // accept only if still ringing
+
       if (full.status !== "RINGING") {
         return;
       }
+       await CallService.connectSession(session_id);
+      // io.to(String(caller_id)).emit("call_accepted", {
+      //   session_id,
+      //   call_type: full.type,
+      //   is_friend: session_id.startsWith("FRIEND")
+      // });
 
-      // ❗ DO NOT connect audio/video here
-      // ❗ DO NOT update CONNECTED here
+      // io.to(String(receiver_id)).emit("call_accepted", {
+      //   session_id,
+      //   call_type: full.type,
+      //    is_friend: session_id.startsWith("FRIEND")
+      // });
 
-      // just notify both users
 
       io.to(String(caller_id)).emit("call_accepted", {
-        session_id,
-        call_type: full.type
-      });
+  session_id,
+  call_type: full.type,
+  is_friend: session_id.startsWith("FRIEND"),
+  caller_id
+});
 
-      io.to(String(receiver_id)).emit("call_accepted", {
-        session_id,
-        call_type: full.type
-      });
+io.to(String(receiver_id)).emit("call_accepted", {
+  session_id,
+  call_type: full.type,
+  is_friend: session_id.startsWith("FRIEND"),
+  caller_id
+});
 
     } catch (err) {
       console.log("call_accept error:", err.message);
@@ -161,38 +73,85 @@ module.exports = (socket, io) => {
   });
 
   /* =============================
-     CALL REJECT
+     CALL REJECT1
   ============================== */
 
-  socket.on("call_reject", async ({ session_id }) => {
+  // socket.on("call_reject", async ({ session_id }) => {
 
-    console.log("❌ call_reject by", myUserId, session_id);
+  //   console.log("❌ call_reject by", myUserId, session_id);
 
-    try {
+  //   try {
 
-      const session =
-        await CallService.getSessionUsers(session_id);
+  //     const session =
+  //       await CallService.getSessionUsers(session_id);
 
-      if (!session) return;
+  //     if (!session) return;
 
-      const { caller_id, receiver_id } = session;
+  //     const { caller_id, receiver_id } = session;
 
-      if (
-        String(caller_id) !== myUserId &&
-        String(receiver_id) !== myUserId
-      ) {
-        return;
-      }
+  //     if (
+  //       String(caller_id) !== myUserId &&
+  //       String(receiver_id) !== myUserId
+  //     ) {
+  //       return;
+  //     }
 
-      await CallService.endSession(session_id);
+  //     await CallService.endSession(session_id);
 
-      io.to(String(caller_id)).emit("call_rejected", { session_id });
-      io.to(String(receiver_id)).emit("call_rejected", { session_id });
+  //     io.to(String(caller_id)).emit("call_rejected", { session_id });
+  //     io.to(String(receiver_id)).emit("call_rejected", { session_id });
 
-    } catch (err) {
-      console.log("call_reject error:", err.message);
+  //   } catch (err) {
+  //     console.log("call_reject error:", err.message);
+  //   }
+  // });
+
+socket.on("call_reject", async ({ session_id }) => {
+  try {
+    const session = await CallService.getSessionUsers(session_id);
+    if (!session) return;
+
+    const full = await CallService.getSessionById(session_id);
+    if (!full) return;
+
+    const { caller_id, receiver_id } = session;
+
+    // Only participants allowed
+    if (
+      String(caller_id) !== myUserId &&
+      String(receiver_id) !== myUserId
+    ) {
+      return;
     }
-  });
+
+    // Only reject if still ringing
+    if (full.status !== "RINGING") return;
+
+    await CallService.endSession(session_id);
+
+    // 🔥 If receiver rejected → caller gets missed call
+    if (String(receiver_id) === myUserId) {
+      await notificationService.createNotification(
+        receiver_id, // sender (rejector)
+        caller_id,   // receiver (original caller)
+        "MISSED_CALL",
+        `Missed ${full.type.toLowerCase()} call`,
+        {
+          call_type: full.type,
+          session_id
+        }
+      );
+
+      io.to(String(caller_id)).emit("new_notification");
+    }
+
+    io.to(String(caller_id)).emit("call_rejected", { session_id });
+    io.to(String(receiver_id)).emit("call_rejected", { session_id });
+
+  } catch (err) {
+    console.log("call_reject error:", err.message);
+  }
+});
 
   audioCallHandler(socket, io);
   videoCallHandler(socket, io);

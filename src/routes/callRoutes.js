@@ -4,21 +4,21 @@ const { authenticateUser } = require("../middlewares/authMiddleware");
 const callController = require("../controllers/callController");
 
 router.post("/start-search", authenticateUser, callController.startSearch);
-router.get("/searching-females", authenticateUser, callController.searchingFemales);
+router.get(
+  "/searching-females",
+  authenticateUser,
+  callController.searchingFemales,
+);
 router.post("/random-connect", authenticateUser, callController.randomConnect);
 router.post("/direct-connect", authenticateUser, callController.directConnect);
 router.post("/cancel-search", authenticateUser, callController.cancelSearch);
 router.get(
   "/connected-details",
   authenticateUser,
-  callController.getConnectedCallDetails
+  callController.getConnectedCallDetails,
 );
 
-router.post(
-  "/friend-connect",
-  authenticateUser,
-  callController.friendConnect
-);
-
+router.post("/friend-connect", authenticateUser, callController.friendConnect);
+router.post("/cancel-waiting", authenticateUser, callController.cancelMaleWaiting);
 
 module.exports = router;

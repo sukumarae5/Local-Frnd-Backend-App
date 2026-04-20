@@ -17,6 +17,7 @@ exports.getUserProfile = async (userId) => {
   u.profile_status,
   u.status,
   u.coin_balance,
+  u.rings_balance,
   u.is_online,
   u.last_seen,
   u.location_lat,
@@ -111,6 +112,7 @@ WHERE u.user_id = ?;
     profile_status: first.profile_status,
     status: first.status,
     coin_balance: first.coin_balance,
+    rings_balance: first.rings_balance,
     is_online: first.is_online,
     last_seen: first.last_seen
   };

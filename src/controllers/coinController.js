@@ -4,8 +4,7 @@ exports.wallet = async (req, res) => {
   const user_id = req.user.user_id;
 
   const [[balance]] = await db.execute(
-    `SELECT coin_balance FROM user WHERE user_id=?`,
-    [user_id]
+`SELECT coin_balance, rings_balance FROM user WHERE user_id=?`    [user_id]
   );
 
   const [history] = await db.execute(
@@ -17,7 +16,8 @@ exports.wallet = async (req, res) => {
   );
 
   res.json({
-    balance: balance.coin_balance,
-    transactions: history,
-  });
+  coins: balance.coin_balance,
+  rings: balance.rings_balance,
+  transactions: history,
+});
 };

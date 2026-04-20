@@ -1,5 +1,3 @@
-
-
 const router = require("express").Router();
 const { authenticateUser } = require("../middlewares/authMiddleware");
 const controller = require("../controllers/notificationController");

@@ -73,30 +73,31 @@ const insertMessage = async (
 const getMessages = async (conversationId, myId, limit = 30, offset = 0) => {
 
   const [rows] = await db.query(
-    `
-    SELECT 
-      m.*,
+   `SELECT 
+  m.*,
 
-      CASE
-        WHEN m.sender_id = ?
-         AND EXISTS (
-            SELECT 1
-            FROM message_reads r
-            WHERE r.message_id = m.message_id
-              AND r.user_id <> ?
-         )
-        THEN 1
-        ELSE 0
-      END AS is_read
+  0 AS delivered,   -- ✅ default = single tick
 
-    FROM messages m
-    WHERE m.conversation_id = ?
-      AND m.is_deleted = 0
+  CASE
+    WHEN m.sender_id = ?
+     AND EXISTS (
+        SELECT 1
+        FROM message_reads r
+        WHERE r.message_id = m.message_id
+          AND r.user_id <> ?
+     )
+    THEN 1
+    ELSE 0
+  END AS is_read
 
-    ORDER BY m.sent_at DESC
-    LIMIT ? OFFSET ?
-    `,
-    [myId, myId, conversationId, Number(limit), Number(offset)]
+FROM messages m
+
+WHERE m.conversation_id = ?
+  AND m.is_deleted = 0
+
+ORDER BY m.sent_at DESC
+LIMIT ? OFFSET ?`,
+    [myId, myId, conversationId, limit, offset]
   );
 
   return rows.reverse();

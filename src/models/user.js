@@ -1,18 +1,17 @@
-const db=require("../config/db")
-
+const db = require("../config/db");
 
 const findByMobile = async (mobile_number) => {
-    console.log("Finding user by mobile number:", mobile_number);
-    const [rows]=await db.execute('SELECT * from user WHERE mobile_number=?',
-        [mobile_number]
-    )
-    return rows[0]
-}
+  console.log("Finding user by mobile number:", mobile_number);
+  const [rows] = await db.execute("SELECT * from user WHERE mobile_number=?", [
+    mobile_number,
+  ]);
+  return rows[0];
+};
 
 const createUserIfNotExist = async (mobile_number) => {
   const [result] = await db.execute(
     "INSERT IGNORE INTO user (mobile_number) VALUES (?)",
-    [mobile_number]
+    [mobile_number],
   );
   return result;
 };
@@ -26,17 +25,15 @@ const markOnline = async (user_id) => {
           last_seen = NOW()
       WHERE user_id = ?
       `,
-      [user_id]
+      [user_id],
     );
 
     console.log("markOnline result:", result);
     console.log("affectedRows:", result.affectedRows);
-
   } catch (err) {
     console.error("markOnline error:", err);
   }
 };
-
 
 const markOffline = async (user_id) => {
   await db.execute(
@@ -46,23 +43,9 @@ const markOffline = async (user_id) => {
         last_seen = NOW()
     WHERE user_id = ?
     `,
-    [user_id]
+    [user_id],
   );
 };
-
-
-// const findByMobileAndOtp= async (mobile_number, otp) => {
-//     const [rows] =await db.execute('SELECT * from user WHERE mobile_number=? AND otp=?',
-//         [mobile_number, otp]
-//     )
-//     return rows[0]
-// }
-
-// const createOrUpdateOtp = async (mobile_number, otp) => {
-//     await db.execute('INSERT INTO user (mobile_number, otp) VALUES (?, ?) ON DUPLICATE KEY UPDATE otp=?',
-//         [mobile_number, otp, otp]
-//     )
-// }
 
 const findByMobileAndOtp = async (mobile_number, otp) => {
   const [rows] = await db.execute(
@@ -70,68 +53,70 @@ const findByMobileAndOtp = async (mobile_number, otp) => {
      WHERE mobile_number = ? 
      AND otp = ?
      AND otp_expires_at > NOW()`,
-    [mobile_number, otp]
+    [mobile_number, otp],
   );
 
   return rows[0];
 };
 
-
-const createOrUpdateOtp = async (mobile_number, otp) => {
+const createOrUpdateOtp = async (mobile_number, otp, minutes = 2) => {
   await db.execute(
     `INSERT INTO user (mobile_number, otp, otp_expires_at)
-     VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 15 SECOND))
+     VALUES (?, ?, DATE_ADD(NOW(), INTERVAL ? MINUTE))
      ON DUPLICATE KEY UPDATE 
        otp = VALUES(otp),
-       otp_expires_at = DATE_ADD(NOW(), INTERVAL 15 SECOND)`,
-    [mobile_number, otp]
+       otp_expires_at = DATE_ADD(NOW(), INTERVAL ? MINUTE)`,
+    [mobile_number, otp, minutes, minutes],
   );
 };
 
 const clearOtp = async (mobile_number) => {
-    await db.execute('UPDATE user SET otp=NULL WHERE mobile_number=?',
-        [mobile_number]
-    )
-}
-
-const findById=async (id) => {
-    const [rows]=await db.execute(`SELECT * from user WHERE user_id=?`, [id])
-    return rows[0]    
-}
-const updateCoinBalance = async (user_id, coins) => {
-    const [result] = await db.execute(
-        `UPDATE user SET coin_balance = coin_balance + ? WHERE user_id=?`,
-        [coins, user_id]
-    );
-    return result;
+  await db.execute("UPDATE user SET otp=NULL WHERE mobile_number=?", [
+    mobile_number,
+  ]);
 };
 
-const updateProfile =async (user_id, userData) => {
-    const fields =[]
-    const values=[]
-    for (const key in userData){
-        fields.push(`${key}=?`);
-        values.push(userData[key])
-    }
-    if (fields.length === 0) {
-        return { affectedRows: 0 };
-    }
-    values.push(user_id)
-    const [result]= await db.execute(`UPDATE user SET ${fields.join(`, `)} WHERE user_id=?`, values)
-    return result
-}
+const findById = async (id) => {
+  const [rows] = await db.execute(`SELECT * from user WHERE user_id=?`, [id]);
+  return rows[0];
+};
+const updateCoinBalance = async (user_id, coins) => {
+  const [result] = await db.execute(
+    `UPDATE user SET coin_balance = coin_balance + ? WHERE user_id=?`,
+    [coins, user_id],
+  );
+  return result;
+};
 
+const updateProfile = async (user_id, userData) => {
+  const fields = [];
+  const values = [];
+  for (const key in userData) {
+    fields.push(`${key}=?`);
+    values.push(userData[key]);
+  }
+  if (fields.length === 0) {
+    return { affectedRows: 0 };
+  }
+  values.push(user_id);
+  const [result] = await db.execute(
+    `UPDATE user SET ${fields.join(`, `)} WHERE user_id=?`,
+    values,
+  );
+  return result;
+};
 
-const getAllUsers= async () => {
-    const [rows] =await db.execute('SELECT * from user')
-    return rows
+const getAllUsers = async () => {
+  const [rows] = await db.execute("SELECT * from user");
+  return rows;
+};
 
-} 
-
-const deleteUserId= async (user_id) => {
-    const [result]=await db.execute('DELETE from user WHERE user_id=?', [user_id])
-    return result
-}
+const deleteUserId = async (user_id) => {
+  const [result] = await db.execute("DELETE from user WHERE user_id=?", [
+    user_id,
+  ]);
+  return result;
+};
 
 const getRandomUsers = async (currentUserId) => {
   const [rows] = await db.execute(
@@ -154,7 +139,7 @@ const getRandomUsers = async (currentUserId) => {
     ORDER BY RAND()
     LIMIT 20
     `,
-    [currentUserId]
+    [currentUserId],
   );
 
   return rows;
@@ -164,7 +149,7 @@ const getRandomUsers = async (currentUserId) => {
 const isValidStateForCountry = async (state_id, country_id) => {
   const [rows] = await db.execute(
     "SELECT id FROM states WHERE id = ? AND country_id = ?",
-    [state_id, country_id]
+    [state_id, country_id],
   );
   return rows.length > 0;
 };
@@ -173,41 +158,39 @@ const isValidStateForCountry = async (state_id, country_id) => {
 const isValidCityForState = async (city_id, state_id) => {
   const [rows] = await db.execute(
     "SELECT id FROM cities WHERE id = ? AND state_id = ?",
-    [city_id, state_id]
+    [city_id, state_id],
   );
   return rows.length > 0;
 };
-
 
 // 🔹 Check if username already exists (except current user)
 const isUsernameTaken = async (username, user_id) => {
   const [rows] = await db.execute(
     "SELECT user_id FROM user WHERE username = ? AND user_id != ? LIMIT 1",
-    [username, user_id]
+    [username, user_id],
   );
   return rows.length > 0;
 };
 
-
-const getProfileById=async (user_id) => {
-     const [rows] = await db.execute(
+const getProfileById = async (user_id) => {
+  const [rows] = await db.execute(
     `
     SELECT user_id, name, username, mobile_number, email, age, date_of_birth,
-           gender, bio, profile_status, status, coin_balance, location_lat,
+           gender, bio, profile_status, status, coin_balance, rings_balance, location_lat,
            location_log, is_online, last_seen
     FROM user
     WHERE user_id = ?
     `,
-    [user_id]
+    [user_id],
   );
 
   return rows[0] || null;
-}
+};
 
 const isUserOnline = async (userId) => {
   const [rows] = await db.execute(
     `SELECT is_online FROM user WHERE user_id = ? LIMIT 1`,
-    [userId]
+    [userId],
   );
   return rows.length ? rows[0].is_online === 1 : false;
 };
@@ -222,17 +205,16 @@ const getRandomOnlineUser = async (currentUserId) => {
       ORDER BY RAND()
       LIMIT 1
     `,
-    [currentUserId]
+    [currentUserId],
   );
 
   return rows[0] || null;
 };
 
 const getRandomOnlineOppositeGenderUser = async (currentUserId) => {
-  const [[me]] = await db.execute(
-    `SELECT gender FROM user WHERE user_id=?`,
-    [currentUserId]
-  );
+  const [[me]] = await db.execute(`SELECT gender FROM user WHERE user_id=?`, [
+    currentUserId,
+  ]);
 
   if (!me || !me.gender) return null;
 
@@ -249,7 +231,7 @@ const getRandomOnlineOppositeGenderUser = async (currentUserId) => {
     ORDER BY RAND()
     LIMIT 10
     `,
-    [currentUserId, targetGender]
+    [currentUserId, targetGender],
   );
 
   return rows[0] || null;
@@ -258,7 +240,7 @@ const getRandomOnlineOppositeGenderUser = async (currentUserId) => {
 const getNearestOnlineFemale = async (userId) => {
   const [[me]] = await db.execute(
     `SELECT location_lat, location_log FROM user WHERE user_id=?`,
-    [userId]
+    [userId],
   );
 
   if (!me?.location_lat || !me?.location_log) return null;
@@ -285,47 +267,192 @@ const getNearestOnlineFemale = async (userId) => {
     ORDER BY distance
     LIMIT 1
     `,
-    [me.location_lat, me.location_log, me.location_lat]
+    [me.location_lat, me.location_log, me.location_lat],
   );
 
   return rows[0] || null;
 };
 
-
-const rewardProfileVerification = async (user_id) => {
+const rewardDailyLogin = async (user_id) => {
   const conn = await db.getConnection();
-  console.log("Rewarding profile verification for user_id:", user_id);
+
   try {
     await conn.beginTransaction();
 
     const [[user]] = await conn.execute(
-      `SELECT gender, profile_status, avatar_id FROM user WHERE user_id=? FOR UPDATE`,
-      [user_id]
+      `SELECT gender, last_daily_reward_at 
+       FROM user 
+       WHERE user_id=? 
+       FOR UPDATE`,
+      [user_id],
     );
 
-    if (!user || user.profile_status === "verified" || !user.avatar_id) {
+    if (!user) {
       await conn.rollback();
-      return false;
+      return null;
     }
 
-    const reward = user.gender === "Female" ? 20 : 50;
+    const today = new Date().toISOString().split("T")[0];
 
-    await conn.execute(
-      `
-      UPDATE user
-      SET coin_balance = coin_balance + ?,
-          profile_status = 'verified',
-          status = 'active'
-      WHERE user_id=?
-      `,
-      [reward, user_id]
-    );
+    if (user.last_daily_reward_at) {
+      const lastRewardDate = new Date(user.last_daily_reward_at)
+        .toISOString()
+        .split("T")[0];
+
+      if (lastRewardDate === today) {
+        await conn.rollback();
+        return null; // Already rewarded today
+      }
+    }
+
+    let reward = null;
+
+    if (user.gender === "Male") {
+      await conn.execute(
+        `UPDATE user
+         SET coin_balance = coin_balance + 10,
+             last_daily_reward_at = NOW()
+         WHERE user_id=?`,
+        [user_id],
+      );
+
+      reward = { type: "coin", amount: 10 };
+    } else if (user.gender === "Female") {
+      await conn.execute(
+        `UPDATE user
+         SET rings_balance = rings_balance + 1,
+             last_daily_reward_at = NOW()
+         WHERE user_id=?`,
+        [user_id],
+      );
+
+      reward = { type: "ring", amount: 1 };
+    }
 
     await conn.commit();
     return reward;
-  } catch (e) {
+  } catch (err) {
     await conn.rollback();
-    throw e;
+    throw err;
+  } finally {
+    conn.release();
+  }
+};
+
+// const rewardProfileVerification = async (user_id) => {
+//   const conn = await db.getConnection();
+//   console.log("Rewarding profile verification for user_id:", user_id);
+//   try {
+//     await conn.beginTransaction();
+
+//     const [[user]] = await conn.execute(
+//       `SELECT gender, profile_status, avatar_id FROM user WHERE user_id=? FOR UPDATE`,
+//       [user_id]
+//     );
+
+//     if (!user || user.profile_status === "verified" || !user.avatar_id) {
+//       await conn.rollback();
+//       return false;
+//     }
+
+//     const reward = user.gender === "Female" ? 20 : 50;
+
+//     await conn.execute(
+//       `
+//       UPDATE user
+//       SET coin_balance = coin_balance + ?,
+//           profile_status = 'verified',
+//           status = 'active'
+//       WHERE user_id=?
+//       `,
+//       [reward, user_id]
+//     );
+
+//     await conn.commit();
+//     return reward;
+//   } catch (e) {
+//     await conn.rollback();
+//     throw e;
+//   } finally {
+//     conn.release();
+//   }
+// };
+
+const rewardProfileVerification = async (user_id) => {
+  const conn = await db.getConnection();
+
+  try {
+    await conn.beginTransaction();
+
+    console.log("🔹 Checking reward for user:", user_id);
+
+    const [[user]] = await conn.execute(
+      `SELECT gender, profile_status, avatar_id
+       FROM user
+       WHERE user_id=? 
+       FOR UPDATE`,
+      [user_id],
+    );
+
+    console.log("🔹 User data:", user);
+
+    if (!user) {
+      console.log("❌ User not found");
+      await conn.rollback();
+      return null;
+    }
+
+    if (user.profile_status === "verified") {
+      console.log("⚠️ Already verified → No reward given");
+      await conn.rollback();
+      return null;
+    }
+
+    if (!user.avatar_id) {
+      console.log("⚠️ No avatar → Reward not allowed");
+      await conn.rollback();
+      return null;
+    }
+
+    let reward = null;
+
+    if (user.gender === "Male") {
+      const [result] = await conn.execute(
+        `UPDATE user
+         SET coin_balance = coin_balance + 50,
+             profile_status = 'verified',
+             status = 'active'
+         WHERE user_id=?`,
+        [user_id],
+      );
+
+      console.log("✅ Coins added:", result.affectedRows);
+      reward = { type: "coin", amount: 50 };
+    } 
+    else if (user.gender === "Female") {
+      const [result] = await conn.execute(
+        `UPDATE user
+         SET rings_balance = rings_balance + 2,
+             profile_status = 'verified',
+             status = 'active'
+         WHERE user_id=?`,
+        [user_id],
+      );
+
+      console.log("✅ Rings added:", result.affectedRows);
+      reward = { type: "ring", amount: 2 }; // ⚠️ fix mismatch
+    }
+
+    await conn.commit();
+
+    console.log("🎉 Reward success:", reward);
+
+    return reward;
+
+  } catch (err) {
+    console.log("❌ Error in reward:", err);
+    await conn.rollback();
+    throw err;
   } finally {
     conn.release();
   }
@@ -337,7 +464,7 @@ const getNearestOnlineFemaleForMale = async (maleUserId, radiusKm = 50) => {
     `SELECT location_lat, location_log, gender
      FROM user
      WHERE user_id = ?`,
-    [maleUserId]
+    [maleUserId],
   );
 
   if (!male || male.gender !== "Male") return null;
@@ -369,12 +496,7 @@ const getNearestOnlineFemaleForMale = async (maleUserId, radiusKm = 50) => {
     ORDER BY distance ASC
     LIMIT 1
     `,
-    [
-      male.location_lat,
-      male.location_log,
-      male.location_lat,
-      radiusKm
-    ]
+    [male.location_lat, male.location_log, male.location_lat, radiusKm],
   );
 
   return rows[0] || null;
@@ -401,38 +523,37 @@ const getRandomOnlineSearchingFemalesWithAvatar = async (limit = 20) => {
       AND cs.status = 'SEARCHING'
     ORDER BY RAND()
     LIMIT ${limit}
-    `
+    `,
   );
 
   return rows;
 };
 
+module.exports = {
+  createUserIfNotExist,
+  findByMobile,
 
-
-
-module.exports={
-    createUserIfNotExist,
-    findByMobile,
-    rewardProfileVerification,
-    getNearestOnlineFemaleForMale,
-    findByMobileAndOtp,
-    getRandomOnlineOppositeGenderUser,
-    createOrUpdateOtp,
-    getNearestOnlineFemale,
-    clearOtp,
-    findById,
-    updateProfile,
-    updateCoinBalance,
-    getAllUsers,
-    isValidStateForCountry,
-    isValidCityForState,
-    isUsernameTaken,
-    deleteUserId,
-    getRandomUsers,
-    getProfileById,
-    isUserOnline,
-    markOffline,
-    markOnline,
-    getRandomOnlineUser,
-    getRandomOnlineSearchingFemalesWithAvatar
-}
+  rewardProfileVerification,
+  getNearestOnlineFemaleForMale,
+  findByMobileAndOtp,
+  getRandomOnlineOppositeGenderUser,
+  createOrUpdateOtp,
+  getNearestOnlineFemale,
+  clearOtp,
+  rewardDailyLogin,
+  findById,
+  updateProfile,
+  updateCoinBalance,
+  getAllUsers,
+  isValidStateForCountry,
+  isValidCityForState,
+  isUsernameTaken,
+  deleteUserId,
+  getRandomUsers,
+  getProfileById,
+  isUserOnline,
+  markOffline,
+  markOnline,
+  getRandomOnlineUser,
+  getRandomOnlineSearchingFemalesWithAvatar,
+};

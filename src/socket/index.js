@@ -4,7 +4,7 @@ const callSocket = require("./callSocket");
 const socketMap = require("./socketMap");
 const notification = require("./notification");
 const chatSocket = require("./chat");
-
+const db = require("../config/db"); 
 
 let ioInstance = null;
 

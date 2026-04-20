@@ -14,39 +14,58 @@ module.exports = (socket, io) => {
   const userId = String(socket.user.user_id);
 
   /* ================= JOIN ================= */
+  // socket.on("video_join", async ({ session_id }) => {
+  //   const room = `video_call:${session_id}`;
+  //   socket.join(room);
+
+  //   if (!joinedUsers.has(session_id)) {
+  //     joinedUsers.set(session_id, new Set());
+  //   }
+
+  //   // ⛔ Prevent duplicate join
+  //   if (joinedUsers.get(session_id).has(userId)) return;
+
+  //   joinedUsers.get(session_id).add(userId);
+
+  //   const roomSize = io.sockets.adapter.rooms.get(room)?.size || 0;
+
+  //   console.log("🎥 video_join", { session_id, userId, roomSize });
+
+  //   // 🔥 Emit ONLY ONCE when 2 users join
+  //   if (roomSize === 2 && !connectedSessions.has(session_id)) {
+  //     connectedSessions.add(session_id);
+
+  //     try {
+  //       await CallService.connectSession(session_id);
+  //     coinService.startLiveBilling(session_id, io);
+      
+  //     } catch (err) {
+  //       console.error("⚠️ connectSession:", err.message);
+  //     }
+
+  //     io.to(room).emit("video_connected");
+  //   }
+  // });
+
+
   socket.on("video_join", async ({ session_id }) => {
-    const room = `video_call:${session_id}`;
-    socket.join(room);
+  const room = `video_call:${session_id}`;
+  socket.join(room);
 
-    if (!joinedUsers.has(session_id)) {
-      joinedUsers.set(session_id, new Set());
-    }
-
-    // ⛔ Prevent duplicate join
-    if (joinedUsers.get(session_id).has(userId)) return;
-
-    joinedUsers.get(session_id).add(userId);
-
+  setTimeout(async () => {
     const roomSize = io.sockets.adapter.rooms.get(room)?.size || 0;
 
-    console.log("🎥 video_join", { session_id, userId, roomSize });
+    console.log("🎥 video_join AFTER DELAY", { session_id, roomSize });
 
-    // 🔥 Emit ONLY ONCE when 2 users join
     if (roomSize === 2 && !connectedSessions.has(session_id)) {
       connectedSessions.add(session_id);
 
-      try {
-        await CallService.connectSession(session_id);
-      coinService.startLiveBilling(session_id, io);
-      
-      } catch (err) {
-        console.error("⚠️ connectSession:", err.message);
-      }
+      await CallService.connectSession(session_id);
 
       io.to(room).emit("video_connected");
     }
-  });
-
+  }, 500); // 🔥 CRITICAL FIX
+});
   /* ================= HEARTBEAT ================= */
   socket.on("video_ping", ({ session_id }) => {
     heartbeats.set(session_id, Date.now());

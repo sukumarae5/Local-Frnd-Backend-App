@@ -42,3 +42,47 @@ exports.withUser = async (req, res) => {
     res.status(500).json({ success: false });
   }
 };
+
+
+exports.getCallHistory = async (req, res) => {
+  try {
+
+    const result = await historyService.fetchAllCallHistory();
+
+    return res.status(200).json(result);
+
+  } catch (error) {
+
+    console.error("Call History Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error"
+    });
+
+  }
+};
+
+
+exports.getUserCallHistory = async (req, res) => {
+
+  try {
+
+    const { id } = req.params;
+
+    const result = await historyService.fetchUserCallHistory(id);
+
+    res.status(200).json(result);
+
+  } catch (error) {
+
+    console.error(error);
+
+    res.status(500).json({
+      success: false,
+      message: "Internal Server Error"
+    });
+
+  }
+
+};

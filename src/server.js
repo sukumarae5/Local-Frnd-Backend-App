@@ -1,5 +1,8 @@
 const express = require('express');
 const cors=require("cors")
+
+require("./cron/statusCleanup");
+
 const multer=require('multer')
 const upload=multer({dest:'uploads/'})
 const socketIO = require('socket.io');
@@ -26,6 +29,9 @@ const ratingRoutes = require("./routes/ratingRoutes");
 const faqRoutes = require("./routes/faqRoutes");
 const supportRoutes = require("./routes/supportRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");  
+const statusRoutes = require("./routes/statusRoutes");  
+const coinPackageRoutes = require("./routes/coinPackageRoutes");  
+const offerRoutes = require("./routes/offerRoutes");  
 const errorHandler = require("./middlewares/errorMiddleware");
 
 
@@ -84,7 +90,11 @@ app.use("/api/chat", chatRoutes);
 app.use("/api/rating", ratingRoutes);
 app.use("/api/faqs", faqRoutes);
 app.use("/api/support", supportRoutes);
-app.use("/notifications", notificationRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/status", statusRoutes);
+app.use("/api/coin-packages", coinPackageRoutes);
+app.use("/api/offers", offerRoutes);
+
 app.use(errorHandler);
 
 
