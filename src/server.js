@@ -31,7 +31,8 @@ const supportRoutes = require("./routes/supportRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");  
 const statusRoutes = require("./routes/statusRoutes");  
 const coinPackageRoutes = require("./routes/coinPackageRoutes");  
-const offerRoutes = require("./routes/offerRoutes");  
+const offerRoutes = require("./routes/offerRoutes"); 
+const purchaseRoutes = require("./routes/purchaseRoutes"); 
 const errorHandler = require("./middlewares/errorMiddleware");
 
 
@@ -94,6 +95,7 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/status", statusRoutes);
 app.use("/api/coin-packages", coinPackageRoutes);
 app.use("/api/offers", offerRoutes);
+app.use("/api/purchase", purchaseRoutes);
 
 app.use(errorHandler);
 
