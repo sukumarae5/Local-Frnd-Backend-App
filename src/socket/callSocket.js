@@ -40,17 +40,7 @@ module.exports = (socket, io) => {
         return;
       }
        await CallService.connectSession(session_id);
-      // io.to(String(caller_id)).emit("call_accepted", {
-      //   session_id,
-      //   call_type: full.type,
-      //   is_friend: session_id.startsWith("FRIEND")
-      // });
-
-      // io.to(String(receiver_id)).emit("call_accepted", {
-      //   session_id,
-      //   call_type: full.type,
-      //    is_friend: session_id.startsWith("FRIEND")
-      // });
+  
 
 
       io.to(String(caller_id)).emit("call_accepted", {
@@ -75,36 +65,6 @@ io.to(String(receiver_id)).emit("call_accepted", {
   /* =============================
      CALL REJECT1
   ============================== */
-
-  // socket.on("call_reject", async ({ session_id }) => {
-
-  //   console.log("❌ call_reject by", myUserId, session_id);
-
-  //   try {
-
-  //     const session =
-  //       await CallService.getSessionUsers(session_id);
-
-  //     if (!session) return;
-
-  //     const { caller_id, receiver_id } = session;
-
-  //     if (
-  //       String(caller_id) !== myUserId &&
-  //       String(receiver_id) !== myUserId
-  //     ) {
-  //       return;
-  //     }
-
-  //     await CallService.endSession(session_id);
-
-  //     io.to(String(caller_id)).emit("call_rejected", { session_id });
-  //     io.to(String(receiver_id)).emit("call_rejected", { session_id });
-
-  //   } catch (err) {
-  //     console.log("call_reject error:", err.message);
-  //   }
-  // });
 
 socket.on("call_reject", async ({ session_id }) => {
   try {
@@ -151,6 +111,22 @@ socket.on("call_reject", async ({ session_id }) => {
   } catch (err) {
     console.log("call_reject error:", err.message);
   }
+});
+
+socket.on('mic_status', ({ session_id, user_id, micOn }) => {
+  console.log('🎤 MIC STATUS:', session_id, user_id, micOn);
+
+  // ✅ send to AUDIO room
+  io.to(`call:${session_id}`).emit('mic_status_update', {
+    user_id,
+    micOn,
+  });
+
+  // ✅ send to VIDEO room
+  io.to(`video_call:${session_id}`).emit('mic_status_update', {
+    user_id,
+    micOn,
+  });
 });
 
   audioCallHandler(socket, io);

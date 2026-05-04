@@ -33,13 +33,6 @@ const startSearch = async (req, res) => {
 };
 
 
-// const searchingFemales = async (req, res) => {
-//   const data = await callModel.getSearchingFemales();
-//   console.log("Searching females data:", data); 
-//   res.json({ success: true, data });
-// };
-
-
 const searchingFemales = async (req, res) => {
   try {
 

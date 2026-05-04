@@ -37,6 +37,7 @@ const createOrder = async (package_id, user_id) => {
    VERIFY PAYMENT + ADD COINS
 ============================= */
 const verifyPayment = async (payload, user_id) => {
+  console.log("Verifying payment with payload:", payload); // Debug log 
   const {
     razorpay_order_id,
     razorpay_payment_id,
@@ -46,15 +47,21 @@ const verifyPayment = async (payload, user_id) => {
 
   /* 🔐 SIGNATURE VERIFY */
   const body = razorpay_order_id + "|" + razorpay_payment_id;
-
+console.log("String to sign:", body); // Debug log
   const expected = crypto
     .createHmac("sha256", process.env.RAZORPAY_SECRET)
     .update(body)
     .digest("hex");
-
+console.log("Expected signature:", expected); // Debug log
   if (expected !== razorpay_signature) {
     throw new Error("Invalid payment signature");
   }
+
+  const order = await razorpay.orders.fetch(razorpay_order_id);
+console.log("Fetched order from Razorpay:", order); // Debug log
+if (!order) {
+  throw new Error("Invalid order");
+}
 
   const conn = await db.getConnection();
 
@@ -66,14 +73,18 @@ const verifyPayment = async (payload, user_id) => {
       razorpay_payment_id,
       conn
     );
-
+console.log("Duplicate payment check result:", duplicate); // Debug log 
     if (duplicate) {
       throw new Error("Payment already processed");
     }
 
     const pkg = await PurchaseModel.getPackageById(package_id, conn);
     if (!pkg) throw new Error("Invalid package");
-
+console.log("Package details:", pkg); // Debug log
+    /* 💰 VALIDATE AMOUNT */
+if (order.amount !== pkg.price_after_discount * 100) {
+  throw new Error("Amount mismatch");
+}
     /* 🔒 LOCK USER */
     await CoinModel.getUserBalanceForUpdate(user_id, conn);
 
