@@ -4,40 +4,6 @@ const callModel = require("../models/callModel");
 const friendModel = require("../models/friendModel");
 
 
-// const startFemaleSearch = async (female_id, type) => {
-//   const conn = await db.getConnection();
-
-//   try {
-//     await conn.beginTransaction();
-
-//     await callModel.cancelFemaleSearchTx(conn, female_id);
-
-//     await callModel.forceEndConnectedByUserTx(conn, female_id);
-
-
-
-//     const session_id = "SEARCH_" + uuidv4();
-
-//     await callModel.createFemaleSearchSession(
-//       conn,
-//       session_id,
-//       female_id,
-//       type
-//     );
-
-//     await conn.commit();
-//     return session_id;
-
-//   } catch (err) {
-//     await conn.rollback();
-//     throw err;
-//   } finally {
-//     conn.release();
-//   }
-// };
-
-
-
 const startFemaleSearch = async (female_id, type) => {
   const conn = await db.getConnection();
 

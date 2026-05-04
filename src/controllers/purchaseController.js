@@ -4,6 +4,7 @@ const purchaseService = require("../services/purchaseService");
    CREATE ORDER
 ============================= */
 const createOrder = async (req, res) => {
+  console.log(req.body)
   try {
     const { package_id } = req.body;
     const user_id = req.user.user_id;
@@ -30,9 +31,10 @@ const createOrder = async (req, res) => {
    VERIFY PAYMENT
 ============================= */
 const verifyPayment = async (req, res) => {
+  console.log(req.body)
   try {
     const user_id = req.user.user_id;
-
+console.log("User ID:", user_id); // Debug log
     const data = await purchaseService.verifyPayment(
       req.body,
       user_id
