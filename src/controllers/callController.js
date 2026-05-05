@@ -276,6 +276,7 @@ const friendConnect = async (req, res) => {
     io.to(String(friend_id)).emit("incoming_call", {
       session_id: session.session_id,
       from: caller_id,
+      caller_id: caller_id,
       call_type: session.type,
       status: "RINGING",
       is_friend: true,
