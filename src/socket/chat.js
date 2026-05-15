@@ -15,8 +15,15 @@ socket.on("chat_send", async (payload) => {
   try {
     const { receiverId, content, message_type } = payload;
 
-    if (!content || !content.trim()) return;
+if (!content) return;
 
+if (message_type === "text" && !content.trim()) return;
+
+const allowedTypes = ["text", "image", "video", "audio", "file"];
+
+if (!allowedTypes.includes(message_type)) {
+  return socket.emit("chat_error", { message: "Invalid message type" });
+}
     const message = await chatService.sendMessage({
       senderId: myId,
       receiverId,

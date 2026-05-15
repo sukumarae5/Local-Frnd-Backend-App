@@ -39,11 +39,10 @@ module.exports = (socket, io) => {
       if (full.status !== "RINGING") {
         return;
       }
-       await CallService.connectSession(session_id);
-  
+      await CallService.connectSession(session_id);
 
-
-      io.to(String(caller_id)).emit("call_accepted", {
+// 🔥 EXISTING EVENT (KEEP THIS)
+io.to(String(caller_id)).emit("call_accepted", {
   session_id,
   call_type: full.type,
   is_friend: session_id.startsWith("FRIEND"),
@@ -55,6 +54,26 @@ io.to(String(receiver_id)).emit("call_accepted", {
   call_type: full.type,
   is_friend: session_id.startsWith("FRIEND"),
   caller_id
+});
+
+// 🔥🔥🔥 ADD THIS (CRITICAL FIX)
+
+// AUDIO
+io.to(String(caller_id)).emit("audio_connected", {
+  session_id,
+});
+
+io.to(String(receiver_id)).emit("audio_connected", {
+  session_id,
+});
+
+// VIDEO
+io.to(String(caller_id)).emit("video_connected", {
+  session_id,
+});
+
+io.to(String(receiver_id)).emit("video_connected", {
+  session_id,
 });
 
     } catch (err) {

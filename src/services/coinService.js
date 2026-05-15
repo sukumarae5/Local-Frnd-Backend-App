@@ -19,14 +19,15 @@ const femaleSeconds = new Map();
 const activeIntervals = new Map();
 const warnedSessions = new Set();
 
-function startLiveBilling(session_id, io) {
+async  function startLiveBilling(session_id, io) {
 
   if (activeIntervals.has(session_id)) return;
 
   if (!femaleSeconds.has(session_id)) {
     femaleSeconds.set(session_id, 0);
   }
-
+await runBillingCycle(session_id, io);
+  console.log("🔥 FIRST BILLING TRIGGERED");
   const interval = setInterval(async () => {
 
     const conn = await db.getConnection();
@@ -281,9 +282,56 @@ async function finalizeOnHangup(session_id) {
   }
 }
 
+async function runBillingCycle(session_id, io) {
+  const conn = await db.getConnection();
+
+  try {
+    await conn.beginTransaction();
+
+    const [[session]] = await conn.execute(
+      `SELECT * FROM call_sessions WHERE session_id=? FOR UPDATE`,
+      [session_id]
+    );
+
+    if (!session || session.status !== "CONNECTED") {
+      await conn.rollback();
+      return;
+    }
+
+    const rate = RATES[session.type];
+
+    const male = await CoinModel.getUserBalanceForUpdate(
+      session.receiver_id,
+      conn
+    );
+
+    if (male.coin_balance < rate) {
+      await conn.rollback();
+      return;
+    }
+
+    await CoinModel.updateUserBalance(
+      session.receiver_id,
+      -rate,
+      conn
+    );
+
+    await conn.commit();
+
+    console.log("💰 FIRST DEDUCTION DONE");
+
+  } catch (err) {
+    await conn.rollback();
+    console.log("❌ billing error", err);
+  } finally {
+    conn.release();
+  }
+}
+
 module.exports = {
   startLiveBilling,
   stopLiveBilling,
   finalizeOnHangup,
   RATES,
+  runBillingCycle,
 };

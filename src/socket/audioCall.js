@@ -28,7 +28,7 @@ socket.on("audio_join", async ({ session_id }) => {
     connectedSessions.add(session_id);
 
     await CallService.connectSession(session_id);
-
+coinService.startLiveBilling(session_id, io);
     console.log("🚀 EMITTING audio_connected");
 
     io.to(room).emit("audio_connected");
@@ -78,4 +78,23 @@ socket.on("audio_ice_candidate", ({ session_id, candidate }) => {
     heartbeats.delete(session_id);
     connectedSessions.delete(session_id);
   });
+
+  socket.on("disconnect", async () => {
+  console.log("❌ USER DISCONNECTED:", socket.id);
+
+  const session_id = socket.session_id;
+  if (!session_id) return;
+
+  try {
+    coinService.stopLiveBilling(session_id);
+
+    await CallService.endSession(session_id);
+    await coinService.finalizeOnHangup(session_id);
+  } catch (err) {
+    console.log("❌ disconnect cleanup error:", err.message);
+  }
+
+  // ✅ THIS IS KEY
+  io.to(`call:${session_id}`).emit("audio_call_ended");
+});
 };
