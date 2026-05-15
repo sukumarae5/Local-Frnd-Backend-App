@@ -27,7 +27,7 @@ module.exports = (socket, io) => {
       connectedSessions.add(session_id);
 
       await CallService.connectSession(session_id);
-
+coinService.startLiveBilling(session_id, io);
       io.to(room).emit("video_connected");
     }
   }, 500); // 🔥 CRITICAL FIX
