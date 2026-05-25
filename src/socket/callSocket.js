@@ -46,14 +46,16 @@ io.to(String(caller_id)).emit("call_accepted", {
   session_id,
   call_type: full.type,
   is_friend: session_id.startsWith("FRIEND"),
-  caller_id
+  caller_id,
+  receiver_id,
 });
 
 io.to(String(receiver_id)).emit("call_accepted", {
   session_id,
   call_type: full.type,
   is_friend: session_id.startsWith("FRIEND"),
-  caller_id
+  caller_id,
+  receiver_id,
 });
 
 // 🔥🔥🔥 ADD THIS (CRITICAL FIX)

@@ -8,7 +8,7 @@ router.get("/profile", authenticateUser, profileController.getProfile);
 
 router.get(
   "/profile/:userId",
-  profileController.getPublicProfile
+  profileController.getProfileById
 );
 
 

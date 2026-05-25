@@ -1,5 +1,6 @@
 const authSocketMiddleware = require("../middlewares/authSocketMiddleware");
 const presenceHandler = require("./presence");
+const chatModel = require("../models/chatModel");
 const callSocket = require("./callSocket");
 const socketMap = require("./socketMap");
 const notification = require("./notification");
@@ -13,7 +14,7 @@ function init(io) {
 
   io.use(authSocketMiddleware);
 
-  io.on("connection", (socket) => {
+  io.on("connection",async  (socket) => {
     const user = socket.user;
     if (!user?.user_id) {
       socket.disconnect(true);
@@ -29,8 +30,17 @@ function init(io) {
     socket.join(userId); 
 
     if (wasOffline) {
-      presenceHandler(io, userId, "online"); 
-    }
+  presenceHandler(io, userId, "online");
+
+  // ✅ NEW CODE
+  const undelivered = await chatModel.getUndeliveredMessages(userId);
+
+  undelivered.forEach(msg => {
+    io.to(String(msg.sender_id)).emit("chat_delivered", {
+      messageId: msg.message_id
+    });
+  });
+}
 
     callSocket(socket, io);
     notification(socket, io);

@@ -158,7 +158,7 @@ console.log("----------------------");
      io.to(String(otherUser)).emit("chat_read_all_update", {
   conversationId,
   readerId: myId,
-  otherUserId: myId   // ✅ ADD THIS
+  otherUserId: otherUser      // ✅ ADD THIS
 });
 
     } catch (e) {
