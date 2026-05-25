@@ -25,40 +25,41 @@ const startFemaleSearch = async (female_id, type) => {
       FOR UPDATE
     `, [type]);
 
-    if (waitingMale.length > 0) {
-      const male = waitingMale[0];
+  if (waitingMale.length > 0) {
+  const male = waitingMale[0];
 
-      // ✅ CONNECT DIRECTLY
-      await conn.execute(`
-        UPDATE call_sessions
-        SET receiver_id = ?,
-            status = 'CONNECTED',
-            started_at = NOW(),
-            updated_at = NOW()
-        WHERE session_id = ?
-      `, [female_id, male.session_id]);
+  await conn.execute(`
+    UPDATE call_sessions
+    SET receiver_id = ?,
+        status = 'CONNECTED',
+        started_at = NOW(),
+        updated_at = NOW()
+    WHERE session_id = ?
+  `, [female_id, male.session_id]);
 
-      await conn.commit();
+  await conn.commit();
 
-      // 🔥 EMIT SOCKET
-      const { getIO } = require("../socket");
-      const io = getIO();
+  const { getIO } = require("../socket");
+  const io = getIO();
 
-      io.to(String(male.caller_id)).emit("call_accepted", {
-        session_id: male.session_id,
-        call_type: type,
-        call_mode: "RANDOM"
-      });
-
-      io.to(String(female_id)).emit("call_accepted", {
-        session_id: male.session_id,
-        call_type: type,
-        call_mode: "RANDOM"
-      });
-
-      return male.session_id;
-    }
-
+  // ✅ Tell male — same event his frontend already handles
+  io.to(String(male.caller_id)).emit("call_accepted", {
+    session_id: male.session_id,
+    call_type: male.type,
+    call_mode: "RANDOM",
+    caller_id: male.caller_id,    // ✅ who called first
+    receiver_id: female_id         // ✅ who joined
+  });
+  // ✅ Tell female — use call_accepted so her CallStatusScreen handles it
+   io.to(String(female_id)).emit("call_accepted", {
+    session_id: male.session_id,
+    call_type: male.type,
+    call_mode: "RANDOM",
+    caller_id: male.caller_id,    // ✅ who called first
+    receiver_id: female_id         // ✅ who joined
+  });
+  return { session_id: male.session_id, matched: true };
+}
     /* =====================================================
        🔥 STEP 2: NORMAL FLOW (IF NO MALE FOUND)
     ===================================================== */
@@ -72,9 +73,9 @@ const startFemaleSearch = async (female_id, type) => {
       type
     );
 
-    await conn.commit();
-
-    return session_id;
+   // Bottom of startFemaleSearch
+await conn.commit();
+return { session_id, matched: false };
 
   } catch (err) {
     await conn.rollback();

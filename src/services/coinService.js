@@ -1,219 +1,186 @@
 const db = require("../config/db");
 const CoinModel = require("../models/coinModel");
 
-/*
-  MALE pays:
-    AUDIO = 1 rupee / minute
-    VIDEO = 2 rupees / minute
-
-  FEMALE earns:
-    1 ring for every 5 minutes
-*/
-
 const RATES = {
-  AUDIO: 1,
-  VIDEO: 2,
+  AUDIO: 10,  // 10 coins per minute deducted from Male
+  VIDEO: 60,  // 60 coins per minute deducted from Male
 };
 
-const femaleSeconds = new Map();
+const FEMALE_EARN_RATE = 10; // Female always gets 10 rings/coins per minute
+
 const activeIntervals = new Map();
 const warnedSessions = new Set();
+const sessionTimers = new Map();
 
-async  function startLiveBilling(session_id, io) {
-
+async function startLiveBilling(session_id, io) {
   if (activeIntervals.has(session_id)) return;
 
-  if (!femaleSeconds.has(session_id)) {
-    femaleSeconds.set(session_id, 0);
-  }
-await runBillingCycle(session_id, io);
-  console.log("🔥 FIRST BILLING TRIGGERED");
-  const interval = setInterval(async () => {
+  const [[session]] = await db.execute(
+    `SELECT started_at FROM call_sessions WHERE session_id=?`,
+    [session_id]
+  );
 
+  if (!session) return;
+
+  sessionTimers.set(session_id, {
+    startTime: new Date(session.started_at).getTime(),
+    firstCharged: false,
+    lastChargedAt: 0
+  });
+
+  console.log(`🔥 Real-time billing started for session: ${session_id}`);
+
+  const interval = setInterval(async () => {
     const conn = await db.getConnection();
 
     try {
       await conn.beginTransaction();
 
-      const [[session]] = await conn.execute(
-        `SELECT * FROM call_sessions WHERE session_id=? FOR UPDATE`,
+      // Fetch the call session AND dynamically resolve who is Male and who is Female
+      const [[callDetails]] = await conn.execute(
+        `SELECT cs.*, 
+                u1.gender AS caller_gender, 
+                u2.gender AS receiver_gender
+         FROM call_sessions cs
+         LEFT JOIN user u1 ON cs.caller_id = u1.user_id
+         LEFT JOIN user u2 ON cs.receiver_id = u2.user_id
+         WHERE cs.session_id = ? FOR UPDATE`,
         [session_id]
       );
 
-      if (!session || session.status !== "CONNECTED") {
+      // Verify the call is still connected
+      if (!callDetails || callDetails.status !== 'CONNECTED') {
         await conn.rollback();
         stopLiveBilling(session_id);
         return;
       }
 
-      const rate = RATES[session.type];
-
-      // male is receiver
-      const male = await CoinModel.getUserBalanceForUpdate(
-        session.receiver_id,
-        conn
-      );
-
-      /* ============================
-         LOW BALANCE WARNING
-      ============================ */
-
-      if (
-        male.coin_balance < rate * 2 &&
-        male.coin_balance >= rate &&
-        !warnedSessions.has(session_id)
-      ) {
-        warnedSessions.add(session_id);
-
-        io?.to(`call:${session_id}`).emit("low_balance_warning", {
-          remainingCoins: male.coin_balance,
-          secondsLeft: 60,
-        });
-
-        io?.to(`video_call:${session_id}`).emit("low_balance_warning", {
-          remainingCoins: male.coin_balance,
-          secondsLeft: 60,
-        });
-      }
-
-      /* ============================
-         NOT ENOUGH BALANCE
-      ============================ */
-
-      if (male.coin_balance < rate) {
-
-        await conn.execute(
-          `UPDATE call_sessions
-           SET status='ENDED', ended_at=NOW()
-           WHERE session_id=?`,
-          [session_id]
-        );
-
-        await conn.commit();
-
-        stopLiveBilling(session_id);
-        warnedSessions.delete(session_id);
-
-        io?.to(`call:${session_id}`).emit("call_insufficient_balance");
-        io?.to(`video_call:${session_id}`).emit("call_insufficient_balance");
-
+      const timer = sessionTimers.get(session_id);
+      if (!timer) {
+        await conn.rollback();
         return;
       }
 
-      /* ============================
-         DEDUCT FROM MALE
-      ============================ */
+      const elapsedSeconds = Math.floor((Date.now() - timer.startTime) / 1000);
 
-      await CoinModel.updateUserBalance(
-        session.receiver_id,
-        -rate,
-        conn
-      );
+      // ❌ Rule: No deductions before the 3rd second
+      if (elapsedSeconds < 3) {
+        await conn.rollback();
+        return;
+      }
 
-      await CoinModel.insertTransaction(
-        session.receiver_id,     // male
-        session.caller_id,       // female
-        session_id,
-        session.type,
-        rate,
-        "DEBIT",
-        "CALL",
-        conn
-      );
+      /* ==========================================
+         INTERVAL/MINUTE CONTROL
+      ========================================== */
+      if (!timer.firstCharged) {
+        // First deduction happens exactly at the 3rd second mark
+        timer.firstCharged = true;
+        timer.lastChargedAt = elapsedSeconds;
+        console.log("💰 First deduction executing at 3rd second threshold...");
+      } else {
+        // Subsequent charges happen every 60 seconds thereafter
+        if (elapsedSeconds - timer.lastChargedAt < 60) {
+          await conn.rollback();
+          return;
+        }
+        timer.lastChargedAt = elapsedSeconds;
+        console.log("💰 Next minute milestone deduction executing...");
+      }
 
-      /* ============================
-         LIVE MALE REMAINING MINUTES
-      ============================ */
+      /* ==========================================
+         DYNAMIC GENDER IDENTIFICATION
+      ========================================== */
+      let maleId = null;
+      let femaleId = null;
 
-      const remainingCoins = male.coin_balance - rate;
-      const remainingMinutes = Math.floor(remainingCoins / rate);
+      if (callDetails.caller_gender === 'Male') {
+        maleId = callDetails.caller_id;
+        femaleId = callDetails.receiver_id;
+      } else if (callDetails.receiver_gender === 'Male') {
+        maleId = callDetails.receiver_id;
+        femaleId = callDetails.caller_id;
+      }
 
-      io?.to(`call:${session_id}`).emit("male_minutes_update", {
-        remainingCoins,
-        remainingMinutes,
-        ratePerMinute: rate
-      });
+      // Safeguard: Cancel billing loop if gender matching breaks
+      if (!maleId || !femaleId) {
+        console.error("❌ Critical: Could not distinguish Male/Female entities on session.");
+        await conn.rollback();
+        stopLiveBilling(session_id);
+        return;
+      }
 
-      io?.to(`video_call:${session_id}`).emit("male_minutes_update", {
-        remainingCoins,
-        remainingMinutes,
-        ratePerMinute: rate
-      });
+      const maleRate = RATES[callDetails.type]; // AUDIO = 10, VIDEO = 60
 
-      /* ============================
-         FEMALE RING LOGIC
-         5 min = 1 ring
-      ============================ */
+      // Lock male profile data to fetch real time balance securely
+      const male = await CoinModel.getUserBalanceForUpdate(maleId, conn);
 
-      const prevSeconds = femaleSeconds.get(session_id) || 0;
-      const newSeconds = prevSeconds + 60;
+      /* ==========================================
+         LOW BALANCE & EXHAUSTION HANDLING
+      ========================================== */
+      if (male.coin_balance < maleRate * 2 && male.coin_balance >= maleRate && !warnedSessions.has(session_id)) {
+        warnedSessions.add(session_id);
+        const warningPayload = { remainingCoins: male.coin_balance, secondsLeft: 60 };
+        io?.to(`call:${session_id}`).emit("low_balance_warning", warningPayload);
+        io?.to(`video_call:${session_id}`).emit("low_balance_warning", warningPayload);
+      }
 
-      femaleSeconds.set(session_id, newSeconds);
+      // If Male doesn't have enough coins, force-end the call instantly
+      if (male.coin_balance < maleRate) {
+        await conn.execute(
+          `UPDATE call_sessions SET status='ENDED', ended_at=NOW() WHERE session_id=?`,
+          [session_id]
+        );
+        await conn.commit();
 
-      // const prevRings = Math.floor(prevSeconds / 300);
-      // const newRings  = Math.floor(newSeconds / 300);
+        stopLiveBilling(session_id);
+        io?.to(`call:${session_id}`).emit("call_insufficient_balance");
+        io?.to(`video_call:${session_id}`).emit("call_insufficient_balance");
+        return;
+      }
 
-      const prevRings = Math.floor(prevSeconds / 60);
-const newRings  = Math.floor(newSeconds / 60);
+      /* ==========================================
+         FINANCIAL BALANCES BALANCING & TRACKING
+      ========================================== */
+      // 1. Deduct Male balance (10 or 60 coins)
+      await CoinModel.updateUserBalance(maleId, -maleRate, conn);
+      await CoinModel.insertTransaction(maleId, femaleId, session_id, callDetails.type, maleRate, "DEBIT", "CALL", conn);
 
-      const ringsToAdd = newRings - prevRings;
+      // 2. Increment Female balance (Always gets 10 coins/rings)
+      await CoinModel.updateUserRingsBalance(femaleId, FEMALE_EARN_RATE, conn);
+      await CoinModel.insertTransaction(femaleId, maleId, session_id, callDetails.type, FEMALE_EARN_RATE, "CREDIT", "RING_EARN", conn);
 
-      /* ============================
-         LIVE FEMALE RINGS UPDATE
-      ============================ */
+      /* ==========================================
+         REAL-TIME SOCKET BROADCASTS
+      ========================================== */
+      const remainingCoins = male.coin_balance - maleRate;
+      const remainingMinutes = Math.floor(remainingCoins / maleRate);
 
-      io?.to(`call:${session_id}`).emit("female_rings_update", {
-        totalRings: newRings,
-        secondsTalked: newSeconds
-      });
+      io?.to(`call:${session_id}`).emit("male_minutes_update", { remainingCoins, remainingMinutes, ratePerMinute: maleRate });
+      io?.to(`video_call:${session_id}`).emit("male_minutes_update", { remainingCoins, remainingMinutes, ratePerMinute: maleRate });
 
-      io?.to(`video_call:${session_id}`).emit("female_rings_update", {
-        totalRings: newRings,
-        secondsTalked: newSeconds
-      });
-
-      if (ringsToAdd > 0) {
-
-  await CoinModel.updateUserRingsBalance(   // ✅ NEW FUNCTION
-    session.caller_id,
-    ringsToAdd,
-    conn
-  );
-
-  await CoinModel.insertTransaction(
-    session.caller_id,
-    session.receiver_id,
-    session_id,
-    session.type,
-    ringsToAdd,
-    "CREDIT",
-    "RING_EARN",
-    conn
-  );
-}
+      io?.to(`call:${session_id}`).emit("female_rings_update", { addedRings: FEMALE_EARN_RATE });
+      io?.to(`video_call:${session_id}`).emit("female_rings_update", { addedRings: FEMALE_EARN_RATE });
 
       await conn.commit();
+      console.log(`✅ Deduction successfully balanced for session: ${session_id}`);
 
     } catch (err) {
-
       await conn.rollback();
-      console.error("❌ Live billing error:", err);
-
+      console.error("❌ Critical exception executed inside billing cycle loop:", err);
     } finally {
       conn.release();
     }
-
-  }, 60_000); // 1 minute
+  }, 1000); // Changed interval accuracy scanner window up to 1 second resolution
 
   activeIntervals.set(session_id, interval);
 }
-
 
 /* ============================
    STOP BILLING
 ============================ */
 
 function stopLiveBilling(session_id) {
+  sessionTimers.delete(session_id);
 
   if (activeIntervals.has(session_id)) {
     clearInterval(activeIntervals.get(session_id));
@@ -221,18 +188,14 @@ function stopLiveBilling(session_id) {
   }
 
   warnedSessions.delete(session_id);
-  femaleSeconds.delete(session_id);
 }
-
 
 /* ============================
    FINALIZE SESSION
 ============================ */
 
 async function finalizeOnHangup(session_id) {
-
   const conn = await db.getConnection();
-
   try {
     await conn.beginTransaction();
 
@@ -251,10 +214,14 @@ async function finalizeOnHangup(session_id) {
       [session.caller_id]
     );
 
-    const [[receiver]] = await conn.execute(
-      `SELECT coin_balance FROM user WHERE user_id=?`,
-      [session.receiver_id]
-    );
+    let receiverBalance = 0;
+    if (session.receiver_id) {
+      const [[receiver]] = await conn.execute(
+        `SELECT coin_balance FROM user WHERE user_id=?`,
+        [session.receiver_id]
+      );
+      if (receiver) receiverBalance = receiver.coin_balance;
+    }
 
     await conn.execute(
       `UPDATE call_sessions
@@ -264,25 +231,26 @@ async function finalizeOnHangup(session_id) {
            updated_at=NOW()
        WHERE session_id=?`,
       [
-        caller.coin_balance,
-        receiver.coin_balance,
-        session_id,
+        caller ? caller.coin_balance : 0,
+        receiverBalance,
+        session_id
       ]
     );
 
     await conn.commit();
-
   } catch (err) {
-
     await conn.rollback();
-    throw err;
-
+    console.error("Error finalizing call metadata on hangup sequence closure:", err);
   } finally {
-    conn.release();
+    conn.release(); // Essential database pool optimization guard
   }
 }
 
-async function runBillingCycle(session_id, io) {
+/* ============================
+   FINAL BILLING ON HANGUP
+============================ */
+
+async function runBillingCycle(session_id) {
   const conn = await db.getConnection();
 
   try {
@@ -298,10 +266,20 @@ async function runBillingCycle(session_id, io) {
       return;
     }
 
+    let maleId, femaleId;
+
+    if (session.caller_gender === "Male") {
+      maleId = session.caller_id;
+      femaleId = session.receiver_id;
+    } else {
+      maleId = session.receiver_id;
+      femaleId = session.caller_id;
+    }
+
     const rate = RATES[session.type];
 
     const male = await CoinModel.getUserBalanceForUpdate(
-      session.receiver_id,
+      maleId,
       conn
     );
 
@@ -310,19 +288,39 @@ async function runBillingCycle(session_id, io) {
       return;
     }
 
-    await CoinModel.updateUserBalance(
-      session.receiver_id,
-      -rate,
+    await CoinModel.updateUserBalance(maleId, -rate, conn);
+
+    await CoinModel.insertTransaction(
+      maleId,
+      femaleId,
+      session_id,
+      session.type,
+      rate,
+      "DEBIT",
+      "CALL",
+      conn
+    );
+
+    await CoinModel.updateUserRingsBalance(femaleId, 10, conn);
+
+    await CoinModel.insertTransaction(
+      femaleId,
+      maleId,
+      session_id,
+      session.type,
+      10,
+      "CREDIT",
+      "RING_EARN",
       conn
     );
 
     await conn.commit();
 
-    console.log("💰 FIRST DEDUCTION DONE");
+    console.log("💰 FINAL DEDUCTION DONE");
 
   } catch (err) {
     await conn.rollback();
-    console.log("❌ billing error", err);
+    console.error("❌ Final billing error:", err);
   } finally {
     conn.release();
   }
@@ -332,6 +330,6 @@ module.exports = {
   startLiveBilling,
   stopLiveBilling,
   finalizeOnHangup,
-  RATES,
   runBillingCycle,
+  RATES
 };

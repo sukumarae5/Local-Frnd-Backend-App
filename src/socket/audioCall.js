@@ -1,39 +1,35 @@
 const CallService = require("../services/callServices");
 const coinService = require("../services/coinService");
 
-
 const joinedUsers = new Map();
-
 const heartbeats = new Map();
-
 const connectedSessions = new Set();
 
 module.exports = (socket, io) => {
   const userId = String(socket.user.user_id);
 
-socket.on("audio_join", async ({ session_id }) => {
-  const room = `call:${session_id}`;
-  socket.join(room);
+  socket.on("audio_join", async ({ session_id }) => {
+    const room = `call:${session_id}`;
+    socket.join(room);
+    socket.session_id = session_id;
 
-  socket.session_id = session_id;
+    const roomUsers = io.sockets.adapter.rooms.get(room);
+    const roomSize = roomUsers ? roomUsers.size : 0;
 
-  const roomUsers = io.sockets.adapter.rooms.get(room);
+    console.log("📞 audio_join details:", { session_id, roomSize });
 
-  const roomSize = roomUsers ? roomUsers.size : 0;
+    // Ensure initialization occurs exactly once when both clients establish WebRTC data lanes
+    if (roomSize === 2 && !connectedSessions.has(session_id)) {
+      connectedSessions.add(session_id);
 
-  console.log("📞 audio_join", { session_id, roomSize });
+      // Note: CallService.connectSession(session_id) is already fired inside call_accept in callSocket.js
+      coinService.startLiveBilling(session_id, io);
+      console.log("🚀 Emitting channel connection confirmation audio_connected");
 
-  // ✅ ONLY TRIGGER WHEN BOTH JOINED
-  if (roomSize === 2 && !connectedSessions.has(session_id)) {
-    connectedSessions.add(session_id);
+      io.to(room).emit("audio_connected");
+    }
+  });
 
-    await CallService.connectSession(session_id);
-coinService.startLiveBilling(session_id, io);
-    console.log("🚀 EMITTING audio_connected");
-
-    io.to(room).emit("audio_connected");
-  }
-});
   /* ================= HEARTBEAT ================= */
   socket.on("audio_ping", ({ session_id }) => {
     heartbeats.set(session_id, Date.now());
@@ -48,53 +44,42 @@ coinService.startLiveBilling(session_id, io);
     socket.to(`call:${session_id}`).emit("audio_answer", { answer });
   });
 
-socket.on("audio_ice_candidate", ({ session_id, candidate }) => {
-  console.log("📥 ICE from", socket.id);
+  socket.on("audio_ice_candidate", ({ session_id, candidate }) => {
+    const room = `call:${session_id}`;
+    // FIX: Using socket.to ensures the packet relays to the remote peer ONLY without bouncing back to the sender
+    socket.to(room).emit("audio_ice_candidate", { candidate });
+  });
 
-  const room = `call:${session_id}`;
-  console.log("📡 SERVER RELAY ICE:", candidate);
-  const roomUsers = io.sockets.adapter.rooms.get(room);
-
-  console.log("👥 Room users:", roomUsers);
-
-  io.to(room).emit("audio_ice_candidate", { candidate });
-});
-
-  /* ================= HANGUP ================= */
-  socket.on("audio_call_hangup", async ({ session_id }) => {
-    console.log("📴 audio_call_hangup", session_id);
+  /* ================= HANGUP & DISCONNECT CLEANUP ================= */
+  const handleAudioHangup = async (session_id) => {
+    if (!session_id) return;
+    console.log("📴 Executing clean structural hangup cycle on session:", session_id);
 
     try {
-      coinService.stopLiveBilling(session_id)
+      coinService.stopLiveBilling(session_id);
       await CallService.endSession(session_id);
       await coinService.finalizeOnHangup(session_id);
     } catch (err) {
-      console.error("❌ hangup error:", err.message);
+      console.error("❌ Audio hangup error processing context metrics:", err.message);
     }
 
     io.to(`call:${session_id}`).emit("audio_call_ended");
 
+    // Free memory frames cleanly
     joinedUsers.delete(session_id);
     heartbeats.delete(session_id);
     connectedSessions.delete(session_id);
+  };
+
+  socket.on("audio_call_hangup", async ({ session_id }) => {
+    await handleAudioHangup(session_id);
   });
 
   socket.on("disconnect", async () => {
-  console.log("❌ USER DISCONNECTED:", socket.id);
-
-  const session_id = socket.session_id;
-  if (!session_id) return;
-
-  try {
-    coinService.stopLiveBilling(session_id);
-
-    await CallService.endSession(session_id);
-    await coinService.finalizeOnHangup(session_id);
-  } catch (err) {
-    console.log("❌ disconnect cleanup error:", err.message);
-  }
-
-  // ✅ THIS IS KEY
-  io.to(`call:${session_id}`).emit("audio_call_ended");
-});
+    console.log("❌ Audio websocket instance state dropped for connection socket:", socket.id);
+    const session_id = socket.session_id;
+    if (session_id && connectedSessions.has(session_id)) {
+      await handleAudioHangup(session_id);
+    }
+  });
 };

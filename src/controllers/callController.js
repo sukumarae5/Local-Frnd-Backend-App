@@ -6,8 +6,6 @@ const notificationService = require("../services/notificationService");
 const db = require("../config/db");
 
 const startSearch = async (req, res) => {
-  console.log("Starting search for user:", req.user);
-
   try {
     if (req.user.gender !== "Female") {
       return res.status(403).json({ error: "Only female can search" });
@@ -15,14 +13,23 @@ const startSearch = async (req, res) => {
 
     const { call_type } = req.body;
 
-    const session_id = await callService.startFemaleSearch(
+    const result = await callService.startFemaleSearch(
       req.user.user_id,
       call_type
     );
 
+    // ✅ If instantly matched with waiting male
+    if (result.matched) {
+      return res.json({
+        success: true,
+        session_id: result.session_id,
+        status: "ACCEPTED"   // ✅ frontend checks this
+      });
+    }
+
     res.json({
       success: true,
-      session_id,
+      session_id: result.session_id,
       status: "SEARCHING"
     });
 
@@ -31,7 +38,6 @@ const startSearch = async (req, res) => {
     res.status(400).json({ error: err.message });
   }
 };
-
 
 const searchingFemales = async (req, res) => {
   try {
@@ -61,8 +67,6 @@ const searchingFemales = async (req, res) => {
 
 
 const randomConnect = async (req, res) => {
-  console.log("Random connect request:", req.user, req.body);
-
   try {
     if (req.user.gender !== "Male") {
       return res.status(403).json({ error: "Only male can call" });
@@ -75,55 +79,58 @@ const randomConnect = async (req, res) => {
       call_type
     );
 
-    // if (!session) {
-    //   return res.json({
-    //     status: "NO_MATCH",
-    //     message: "No female users currently searching"
-    //   });
-    // }
-
     if (!session) {
+      // ✅ Coin check already happened inside randomMatchMale and threw INSUFFICIENT_BALANCE
+      // So if we reach here with null, it means no female found (not coin issue)
+      // Clean old WAITING rows first
+      await db.execute(`
+        DELETE FROM call_sessions 
+        WHERE caller_id = ? AND status = 'WAITING'
+      `, [req.user.user_id]);
 
-  const waitingSessionId = "WAIT_" + Date.now();
+      const waitingSessionId = "WAIT_" + require("uuid").v4();
 
-  // 🔥 STEP 1: REMOVE OLD WAITING (ADD HERE)
-  await db.execute(`
-    DELETE FROM call_sessions 
-    WHERE caller_id = ? AND status = 'WAITING'
-  `, [req.user.user_id]);
+      // ✅ ADD coin_rate_per_min and finalized columns
+      await db.execute(`
+        INSERT INTO call_sessions
+        (session_id, caller_id, receiver_id, status, type, coin_rate_per_min, finalized, created_at, updated_at)
+        VALUES (?, ?, NULL, 'WAITING', ?, 0, 0, NOW(), NOW())
+      `, [waitingSessionId, req.user.user_id, call_type]);
 
-  // 🔥 STEP 2: INSERT NEW WAITING
-  await db.execute(`
-    INSERT INTO call_sessions
-    (session_id, caller_id, receiver_id, status, type, created_at, updated_at)
-    VALUES (?, ?, NULL, 'WAITING', ?, NOW(), NOW())
-  `, [waitingSessionId, req.user.user_id, call_type]);
+      return res.json({ status: "NO_MATCH", session_id: waitingSessionId });
+    }
 
-  return res.json({
-    status: "NO_MATCH"
+   if (session) {
+  const io = getIO();
+
+  // ✅ Male is caller, female (session.caller_id in DB) becomes receiver
+  io.to(String(session.caller_id)).emit("incoming_call", {
+    session_id: session.session_id,
+    from: req.user.user_id,
+    call_type,
+    status: "ACCEPTED",
+    call_mode: "RANDOM",
+    caller_id: req.user.user_id,       // ✅ male called first
+    receiver_id: session.caller_id      // ✅ female who was searching
+  });
+
+  res.json({
+    status: "ACCEPTED",
+    session_id: session.session_id,
+    call_type,
+    caller_id: req.user.user_id,        // ✅ male called first
+    receiver_id: session.caller_id       // ✅ female who was searching
   });
 }
 
-    const io = getIO();
-io.to(String(session.caller_id)).emit("incoming_call", {
-  session_id: session.session_id,
-  from: req.user.user_id,
-  call_type,
-  status: "ACCEPTED",
-  call_mode: "RANDOM"
-});
-    res.json({
-      status: "ACCEPTED",
-      session_id: session.session_id,
-      call_type
-    });
-
   } catch (err) {
+    if (err.message === "INSUFFICIENT_BALANCE") {
+      return res.status(400).json({ error: "INSUFFICIENT_BALANCE" });
+    }
     console.error("randomConnect error:", err.message);
     res.status(400).json({ error: err.message });
   }
 };
-
 
 
 const directConnect = async (req, res) => {
@@ -133,9 +140,10 @@ const directConnect = async (req, res) => {
     }
 
     const { female_id, call_type } = req.body;
+    const caller_id = req.user.user_id;  // ✅ male is caller
 
     const session = await callService.directMatchMale(
-      req.user.user_id,
+      caller_id,
       female_id,
       call_type
     );
@@ -148,18 +156,24 @@ const directConnect = async (req, res) => {
 
     const io = getIO();
 
+    // ✅ session.caller_id = female (she was searching)
+    // ✅ male (req.user.user_id) is the actual caller
     io.to(String(session.caller_id)).emit("incoming_call", {
       session_id: session.session_id,
-      from: req.user.user_id,
+      from: caller_id,
       call_type,
       status: "ACCEPTED",
-  call_mode: "DIRECT"
+      call_mode: "DIRECT",
+      caller_id: caller_id,           // ✅ male called first
+      receiver_id: session.caller_id, // ✅ female who was searching
     });
 
     res.json({
       status: "ACCEPTED",
       session_id: session.session_id,
-      call_type
+      call_type,
+      caller_id: caller_id,           // ✅ ADD
+      receiver_id: session.caller_id, // ✅ ADD
     });
 
   } catch (err) {

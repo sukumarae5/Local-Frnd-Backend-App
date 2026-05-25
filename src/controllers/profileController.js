@@ -1,8 +1,9 @@
 const profileService = require("../services/profileService");
 
+// 👤 My profile (from token)
 exports.getProfile = async (req, res) => {
   try {
-    const userId = req.user.user_id; // from JWT middleware
+    const userId = req.user.user_id;
 
     const profileData = await profileService.getUserProfile(userId);
 
@@ -16,22 +17,18 @@ exports.getProfile = async (req, res) => {
     });
 
   } catch (err) {
-    console.log("Profile error:", err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
-
-exports.getPublicProfile = async (req, res) => {
+// 👥 Any user (by id)
+exports.getProfileById = async (req, res) => {
   try {
-    const targetUserId = req.params.userId;
+    const userId = req.params.userId;
 
-    const profile = await profileService.getPublicUserProfile(
-      null, // viewerId not available
-      targetUserId
-    );
+    const profileData = await profileService.getUserProfile(userId);
 
-    if (!profile) {
+    if (!profileData) {
       return res.status(404).json({
         success: false,
         message: "User not found"
@@ -40,10 +37,15 @@ exports.getPublicProfile = async (req, res) => {
 
     res.json({
       success: true,
-      profile
+      ...profileData
     });
+
   } catch (err) {
-    console.error("Public profile error:", err);
-    res.status(500).json({ success: false, message: "Server error" });
+    res.status(500).json({
+      success: false,
+      message: "Server error"
+    });
   }
 };
+
+

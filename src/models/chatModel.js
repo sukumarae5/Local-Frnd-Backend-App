@@ -145,6 +145,20 @@ const markConversationRead = async (conversationId, userId) => {
   );
 };
 
+const getUndeliveredMessages = async (userId) => {
+  const [rows] = await db.query(`
+    SELECT m.message_id, m.sender_id
+    FROM messages m
+    LEFT JOIN message_reads r
+      ON r.message_id = m.message_id
+      AND r.user_id = ?
+    WHERE m.sender_id <> ?
+      AND r.message_id IS NULL
+  `, [userId, userId]);
+
+  return rows;
+};
+
 module.exports = {
   areFriends,
   getConversation,
@@ -154,4 +168,5 @@ module.exports = {
   deleteMessage,
   markRead,
   markConversationRead,
+  getUndeliveredMessages
 };
