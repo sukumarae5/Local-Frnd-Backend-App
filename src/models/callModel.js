@@ -302,49 +302,36 @@ const cancelFemaleSearchTx = async (conn, female_id) => {
 };
 
 
+// ✅ REPLACE getConnectedCallBothUsers
 const getConnectedCallBothUsers = async (user_id) => {
-
   const [rows] = await db.execute(
     `
     SELECT
       cs.session_id,
       cs.type,
-
-      -- caller
       cu.user_id     AS caller_id,
       cu.name        AS caller_name,
       cu.gender      AS caller_gender,
       cu.bio         AS caller_bio,
       ca.image_url   AS caller_avatar,
-
-      -- receiver (connected user)
       ru.user_id     AS receiver_id,
       ru.name        AS receiver_name,
       ru.gender      AS receiver_gender,
       ru.bio         AS receiver_bio,
       ra.image_url   AS receiver_avatar
-
     FROM call_sessions cs
-
-    JOIN user cu
-      ON cu.user_id = cs.caller_id
-
-    LEFT JOIN avatars ca
-      ON ca.avatar_id = cu.avatar_id
-
-    JOIN user ru
-      ON ru.user_id = cs.receiver_id
-
-    LEFT JOIN avatars ra
-      ON ra.avatar_id = ru.avatar_id
-
-    WHERE cs.status = 'CONNECTED'
+    JOIN user cu ON cu.user_id = cs.caller_id
+    LEFT JOIN avatars ca ON ca.avatar_id = cu.avatar_id
+    JOIN user ru ON ru.user_id = cs.receiver_id
+    LEFT JOIN avatars ra ON ra.avatar_id = ru.avatar_id
+    WHERE cs.status IN ('CONNECTED', 'RINGING')
       AND (cs.caller_id = ? OR cs.receiver_id = ?)
+    ORDER BY cs.created_at DESC
     LIMIT 1
     `,
     [user_id, user_id]
   );
-console.log("getConnectedCallBothUsers - rows:", rows); 
+  console.log("getConnectedCallBothUsers - rows:", rows);
   return rows[0] || null;
 };
 
@@ -408,20 +395,19 @@ const getSessionUsers = async (session_id) => {
   return rows[0] || null;
 };
 
+// ✅ REPLACE connectSession
 const connectSession = async (session_id) => {
   const [result] = await db.execute(
     `
     UPDATE call_sessions
     SET status = 'CONNECTED',
-        started_at = NOW(),
+        started_at = COALESCE(started_at, NOW()),
         updated_at = NOW()
     WHERE session_id = ?
-      AND status = 'RINGING'
-    `
-    ,
+      AND status IN ('RINGING', 'CONNECTED')
+    `,
     [session_id]
   );
-
   return result;
 };
 

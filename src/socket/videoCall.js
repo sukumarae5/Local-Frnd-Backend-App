@@ -8,25 +8,32 @@ const connectedSessions = new Set();
 module.exports = (socket, io) => {
   const userId = String(socket.user.user_id);
 
-  socket.on("video_join", async ({ session_id }) => {
-    const room = `video_call:${session_id}`;
-    socket.join(room);
-    socket.session_id = session_id;
+  // ✅ REPLACE the video_join handler
+socket.on("video_join", async ({ session_id }) => {
+  const room = `video_call:${session_id}`;
+  socket.join(room);
+  socket.session_id = session_id;
 
-    const roomUsers = io.sockets.adapter.rooms.get(room);
-    const roomSize = roomUsers ? roomUsers.size : 0;
+  const roomUsers = io.sockets.adapter.rooms.get(room);
+  const roomSize = roomUsers ? roomUsers.size : 0;
 
-    console.log("🎥 video_join details:", { session_id, roomSize });
+  console.log("🎥 video_join details:", { session_id, roomSize });
 
-    if (roomSize === 2 && !connectedSessions.has(session_id)) {
-      connectedSessions.add(session_id);
+  if (roomSize === 2 && !connectedSessions.has(session_id)) {
+    connectedSessions.add(session_id);
 
-      coinService.startLiveBilling(session_id, io);
-      console.log("🚀 Emitting channel connection confirmation video_connected");
-      
-      io.to(room).emit("video_connected");
+    // ✅ Force connect — handles RINGING friend sessions
+    try {
+      await CallService.connectSession(session_id);
+    } catch (e) {
+      console.log("connectSession in video_join:", e.message);
     }
-  });
+
+    coinService.startLiveBilling(session_id, io);
+    console.log("🚀 Emitting video_connected");
+    io.to(room).emit("video_connected");
+  }
+});
 
   /* ================= HEARTBEAT ================= */
   socket.on("video_ping", ({ session_id }) => {

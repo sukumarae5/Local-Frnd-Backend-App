@@ -8,27 +8,33 @@ const connectedSessions = new Set();
 module.exports = (socket, io) => {
   const userId = String(socket.user.user_id);
 
-  socket.on("audio_join", async ({ session_id }) => {
-    const room = `call:${session_id}`;
-    socket.join(room);
-    socket.session_id = session_id;
+  // ✅ REPLACE the audio_join handler
+socket.on("audio_join", async ({ session_id }) => {
+  const room = `call:${session_id}`;
+  socket.join(room);
+  socket.session_id = session_id;
 
-    const roomUsers = io.sockets.adapter.rooms.get(room);
-    const roomSize = roomUsers ? roomUsers.size : 0;
+  const roomUsers = io.sockets.adapter.rooms.get(room);
+  const roomSize = roomUsers ? roomUsers.size : 0;
 
-    console.log("📞 audio_join details:", { session_id, roomSize });
+  console.log("📞 audio_join details:", { session_id, roomSize });
 
-    // Ensure initialization occurs exactly once when both clients establish WebRTC data lanes
-    if (roomSize === 2 && !connectedSessions.has(session_id)) {
-      connectedSessions.add(session_id);
+  if (roomSize === 2 && !connectedSessions.has(session_id)) {
+    connectedSessions.add(session_id);
 
-      // Note: CallService.connectSession(session_id) is already fired inside call_accept in callSocket.js
-      coinService.startLiveBilling(session_id, io);
-      console.log("🚀 Emitting channel connection confirmation audio_connected");
-
-      io.to(room).emit("audio_connected");
+    // ✅ Force connect session — handles RINGING friend sessions
+    // For RANDOM/DIRECT this is already CONNECTED so update is a no-op
+    try {
+      await CallService.connectSession(session_id);
+    } catch (e) {
+      console.log("connectSession in audio_join:", e.message);
     }
-  });
+
+    coinService.startLiveBilling(session_id, io);
+    console.log("🚀 Emitting audio_connected");
+    io.to(room).emit("audio_connected");
+  }
+});
 
   /* ================= HEARTBEAT ================= */
   socket.on("audio_ping", ({ session_id }) => {
