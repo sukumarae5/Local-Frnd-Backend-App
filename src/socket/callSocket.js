@@ -58,25 +58,6 @@ io.to(String(receiver_id)).emit("call_accepted", {
   receiver_id,
 });
 
-// 🔥🔥🔥 ADD THIS (CRITICAL FIX)
-
-// AUDIO
-io.to(String(caller_id)).emit("audio_connected", {
-  session_id,
-});
-
-io.to(String(receiver_id)).emit("audio_connected", {
-  session_id,
-});
-
-// VIDEO
-io.to(String(caller_id)).emit("video_connected", {
-  session_id,
-});
-
-io.to(String(receiver_id)).emit("video_connected", {
-  session_id,
-});
 
     } catch (err) {
       console.log("call_accept error:", err.message);
