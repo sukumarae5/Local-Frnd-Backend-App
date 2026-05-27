@@ -139,37 +139,78 @@ console.log("----------------------");
 
 
   /* ---------------- READ ALL (OPTIONAL) ---------------- */
+socket.on("chat_read_all", async ({ conversationId }) => {
+  try {
+    await chatModel.markConversationRead(conversationId, myId);
 
-  socket.on("chat_read_all", async ({ conversationId }) => {
-    try {
+    const [[row]] = await db.query(
+      `SELECT user1_id, user2_id FROM conversations WHERE conversation_id = ?`,
+      [conversationId]
+    );
 
-      await chatModel.markConversationRead(conversationId, myId);
+    if (!row) return;
 
-      const [[row]] = await db.query(
-        `SELECT user1_id, user2_id FROM conversations WHERE conversation_id = ?`,
-        [conversationId]
-      );
+    const otherUser =
+      row.user1_id === myId ? row.user2_id : row.user1_id;
 
-      if (!row) return;
+    // 🔥 IMPORTANT: send BOTH updates
 
-      const otherUser =
-        row.user1_id === myId ? row.user2_id : row.user1_id;
+    io.to(String(otherUser)).emit("chat_read_all_update", {
+      otherUserId: myId,
+    });
 
-     io.to(String(otherUser)).emit("chat_read_all_update", {
-  conversationId,
-  readerId: myId,
-  otherUserId: otherUser      // ✅ ADD THIS
+    // 🔥 ALSO send individual updates
+    const [messages] = await db.query(`
+      SELECT message_id
+      FROM messages
+      WHERE conversation_id = ?
+    `, [conversationId]);
+
+    messages.forEach(msg => {
+      io.to(String(otherUser)).emit("chat_read_update", {
+        messageId: msg.message_id,
+      });
+    });
+
+  } catch (e) {
+    console.error("❌ chat_read_all error:", e);
+  }
 });
 
-    } catch (e) {
-      console.error("❌ chat_read_all error:", e);
-    }
+
+
+ socket.on("chat_open", async ({ userId, chattingWith }) => {
+  console.log("CHAT OPEN:", userId, "->", chattingWith);
+
+  activeChats[userId] = chattingWith;
+
+const [unreadMessages] = await db.query(`
+  SELECT m.message_id, m.sender_id
+  FROM messages m
+  LEFT JOIN message_reads r 
+    ON r.message_id = m.message_id 
+    AND r.user_id = ?
+  WHERE m.conversation_id = (
+    SELECT conversation_id FROM conversations
+    WHERE (user1_id = ? AND user2_id = ?)
+       OR (user1_id = ? AND user2_id = ?)
+  )
+  AND m.sender_id <> ?
+  AND r.message_id IS NULL
+`, [userId, userId, chattingWith, chattingWith, userId, userId]);
+
+// ✅ SAFE LOOP
+for (const msg of unreadMessages || []) {
+  await chatModel.markRead(msg.message_id, userId);
+
+  io.to(String(msg.sender_id)).emit("chat_read_update", {
+    messageId: msg.message_id,
   });
 
-  socket.on("chat_open", ({ userId, chattingWith }) => {
-   console.log("CHAT OPEN:", userId, "->", chattingWith);
-    activeChats[userId] = chattingWith;
-  socket.currentChatUser = chattingWith;
+  io.to(String(msg.sender_id)).emit("chat_read_all_update", {
+    otherUserId: userId,
+  });
+}
 });
 
 socket.on("chat_close", ({ userId }) => {
