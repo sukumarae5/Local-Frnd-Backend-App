@@ -18,7 +18,7 @@ const insertPurchase = async (
   await conn.execute(
     `INSERT INTO transactions
     (user_id, type, amount_coins, real_money_amount, platform_transaction_id, platform)
-    VALUES (?, 'PURCHASE', ?, ?, ?, 'Razorpay')`,
+    VALUES (?, 'PURCHASE', ?, ?, ?, 'Web')`,
     [user_id, coins, amount, payment_id]
   );
 };
