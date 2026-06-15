@@ -5,9 +5,7 @@ const crypto = require("crypto");
 const PurchaseModel = require("../models/purchaseModel");
 const CoinModel = require("../models/coinModel");
 
-/* =============================
-   CREATE ORDER
-============================= */
+
 const createOrder = async (package_id, user_id) => {
   const conn = await db.getConnection();
 
@@ -33,9 +31,7 @@ const createOrder = async (package_id, user_id) => {
   }
 };
 
-/* =============================
-   VERIFY PAYMENT + ADD COINS
-============================= */
+
 const verifyPayment = async (payload, user_id) => {
   console.log("Verifying payment with payload:", payload); // Debug log 
   const {
@@ -68,7 +64,6 @@ if (!order) {
   try {
     await conn.beginTransaction();
 
-    /* ❌ DUPLICATE CHECK */
     const duplicate = await PurchaseModel.checkDuplicatePayment(
       razorpay_payment_id,
       conn
@@ -82,16 +77,32 @@ console.log("Duplicate payment check result:", duplicate); // Debug log
     if (!pkg) throw new Error("Invalid package");
 console.log("Package details:", pkg); // Debug log
     /* 💰 VALIDATE AMOUNT */
-if (order.amount !== pkg.price_after_discount * 100) {
+if (order.amount !== Math.round(Number(pkg.price_after_discount) * 100)) {
   throw new Error("Amount mismatch");
 }
-    /* 🔒 LOCK USER */
-    await CoinModel.getUserBalanceForUpdate(user_id, conn);
+  
+const user = await CoinModel.getUserBalanceForUpdate(user_id, conn);
 
-    /* 💰 ADD COINS */
-    await CoinModel.updateUserBalance(user_id, pkg.coins, conn);
+if (!user) {
+  throw new Error("User not found");
+}
 
-    /* 🪙 TRANSACTION ENTRY */
+console.log("Before update");
+
+const [updateResult] = await conn.execute(
+  `UPDATE user 
+   SET coin_balance = coin_balance + ?, updates_at = NOW()
+   WHERE user_id = ?`,
+  [pkg.coins, user_id]
+);
+
+console.log("Update result:", updateResult);
+
+if (updateResult.affectedRows === 0) {
+  throw new Error("Coin update failed");
+}
+
+console.log("After update");
     await CoinModel.insertTransaction(
       user_id,
       null,
@@ -103,7 +114,6 @@ if (order.amount !== pkg.price_after_discount * 100) {
       conn
     );
 
-    /* 💳 SAVE PURCHASE */
     await PurchaseModel.insertPurchase(
       user_id,
       pkg.coins,
@@ -114,15 +124,24 @@ if (order.amount !== pkg.price_after_discount * 100) {
 
     await conn.commit();
 
+    const [[updatedUser]] = await conn.execute(
+  "SELECT coin_balance FROM user WHERE user_id = ?",
+  [user_id]
+);
+
+console.log("✅ FINAL COINS:", updatedUser.coin_balance);
+
+
     return {
       message: "Coins added successfully",
       coins_added: pkg.coins
     };
 
   } catch (err) {
-    await conn.rollback();
-    throw err;
-  } finally {
+  console.error("VERIFY ERROR:", err); // always log full error
+  await conn.rollback();
+  throw err;
+} finally {
     conn.release();
   }
 };
