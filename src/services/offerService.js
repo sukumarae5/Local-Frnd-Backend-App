@@ -39,6 +39,7 @@ const addOffer = async (req) => {
     start_date: req.body.start_date,
     end_date: req.body.end_date,
     priority: req.body.priority,
+    target_audience: req.body.target_audience,
   };
   console.log("Adding offer with data:", data);
   return await offerModel.addOffer(data);
@@ -59,6 +60,7 @@ const updateOffer = async (id, req) => {
     start_date: req.body.start_date,
     end_date: req.body.end_date,
     priority: req.body.priority,
+    target_audience: req.body.target_audience,
   };
   console.log("Updating offer with data:", data, id);
   return await offerModel.updateOffer(id, data);
