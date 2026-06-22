@@ -26,11 +26,10 @@ const getOfferById = async (id) => {
 };
 
 const addOffer = async (data) => {
-
   const [result] = await db.query(
     `INSERT INTO offers
-    (title,description,image_url,redirect_url,start_date,end_date,priority)
-    VALUES (?,?,?,?,?,?,?)`,
+    (title, description, image_url, redirect_url, start_date, end_date, priority, target_audience)
+    VALUES (?,?,?,?,?,?,?,?)`,
     [
       data.title,
       data.description,
@@ -38,19 +37,18 @@ const addOffer = async (data) => {
       data.redirect_url,
       data.start_date,
       data.end_date,
-      data.priority
+      data.priority,
+      data.target_audience,
     ]
   );
 
   return result;
-
 };
 
 const updateOffer = async (id, data) => {
-
   const [result] = await db.query(
     `UPDATE offers
-     SET title=?,description=?,image_url=?,redirect_url=?,start_date=?,end_date=?,priority=?
+     SET title=?, description=?, image_url=?, redirect_url=?, start_date=?, end_date=?, priority=?, target_audience=?
      WHERE id=?`,
     [
       data.title,
@@ -60,12 +58,12 @@ const updateOffer = async (id, data) => {
       data.start_date,
       data.end_date,
       data.priority,
-      id
+      data.target_audience,
+      id,
     ]
   );
 
   return result;
-
 };
 
 const deleteOffer = async (id) => {

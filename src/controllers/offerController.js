@@ -2,12 +2,24 @@ const offerService = require("../services/offerService");
 
 const getAllOffers = async (req, res) => {
   try {
-    const gender = req.user.gender; // from JWT middleware
+    console.log("Query:", req.query);
+    console.log("User:", req.user);
+
+    const allowed = ["MALE", "FEMALE", "ALL"];
+
+    let gender =
+      req.query.gender || req.user?.gender || "ALL";
+
+    // ✅ safety check
+    if (!allowed.includes(gender)) {
+      gender = "ALL";
+    }
+
+    console.log("Final Gender Used:", gender);
 
     const data = await offerService.getAllOffers(gender);
 
     res.json(data);
-
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
