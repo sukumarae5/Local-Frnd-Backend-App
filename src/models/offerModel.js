@@ -1,13 +1,17 @@
 const db = require("../config/db");
 
-const getAllOffers = async () => {
-
+const getAllOffers = async (gender) => {
   const [rows] = await db.query(
-    "SELECT * FROM offers WHERE status = 1 ORDER BY priority DESC"
+    `SELECT * FROM offers 
+     WHERE status = 1 
+     AND (target_audience = ? OR target_audience = 'ALL')
+     AND (start_date IS NULL OR start_date <= NOW())
+     AND (end_date IS NULL OR end_date >= NOW())
+     ORDER BY priority DESC`,
+    [gender]
   );
 
   return rows;
-
 };
 
 const getOfferById = async (id) => {

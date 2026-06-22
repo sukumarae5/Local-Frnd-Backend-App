@@ -80,6 +80,24 @@ socket.on("video_join", async ({ session_id }) => {
     await handleVideoHangup(session_id);
   });
 
+  // ── FACE STATUS ──────────────────────────────
+socket.on('face_status', ({ session_id, user_id, face_visible }) => {
+  console.log(`👤 Face status from ${user_id}: visible=${face_visible}`);
+  // Broadcast to the OTHER user in the same video room
+  socket.to(`video_call:${session_id}`).emit('face_status_update', {
+    user_id,
+    face_visible,
+  });
+});
+
+socket.on('camera_status', ({ session_id, user_id, camera_on }) => {
+  console.log(`📷 Camera status from ${user_id}: on=${camera_on}`);
+  socket.to(`video_call:${session_id}`).emit('camera_status_update', {
+    user_id,
+    camera_on,
+  });
+});
+
   socket.on("disconnect", async () => {
     console.log("❌ Video websocket instance state dropped for connection socket:", socket.id);
     const session_id = socket.session_id;
