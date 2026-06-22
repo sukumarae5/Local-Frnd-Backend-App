@@ -17,8 +17,8 @@ const uploadImage = (buffer) => {
   });
 };
 
-const getAllOffers = async () => {
-  return await offerModel.getAllOffers();
+const getAllOffers = async (gender) => {
+  return await offerModel.getAllOffers(gender);
 };
 
 const getOfferById = async (id) => {

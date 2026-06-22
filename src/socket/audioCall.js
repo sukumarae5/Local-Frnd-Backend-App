@@ -57,35 +57,56 @@ socket.on("audio_join", async ({ session_id }) => {
   });
 
   /* ================= HANGUP & DISCONNECT CLEANUP ================= */
-  const handleAudioHangup = async (session_id) => {
-    if (!session_id) return;
-    console.log("📴 Executing clean structural hangup cycle on session:", session_id);
+  
+  
+const handleAudioHangup = async (session_id, socketInstance) => {
+  if (!session_id) return;
 
-    try {
-      coinService.stopLiveBilling(session_id);
-      await CallService.endSession(session_id);
-      await coinService.finalizeOnHangup(session_id);
-    } catch (err) {
-      console.error("❌ Audio hangup error processing context metrics:", err.message);
-    }
+  if (!connectedSessions.has(session_id)) {
+    console.log("⚠️ Already handled:", session_id);
+    return;
+  }
 
-    io.to(`call:${session_id}`).emit("audio_call_ended");
+  console.log("📴 Hangup session:", session_id);
 
-    // Free memory frames cleanly
-    joinedUsers.delete(session_id);
-    heartbeats.delete(session_id);
-    connectedSessions.delete(session_id);
-  };
+  // ✅ FIRST: mark as ended
+  connectedSessions.delete(session_id);
+
+  try {
+    coinService.stopLiveBilling(session_id);
+    await CallService.endSession(session_id);
+    await coinService.finalizeOnHangup(session_id);
+  } catch (err) {
+    console.error("❌ Audio hangup error:", err.message);
+  }
+
+  const endedBy = socketInstance?.user?.user_id;
+  const endedByName = socketInstance?.user?.name || "User";
+
+  // ✅ THEN emit
+  io.to(`call:${session_id}`).emit("call_ended", {
+    session_id,
+    endedBy,
+    endedByName,
+  });
+
+  joinedUsers.delete(session_id);
+  heartbeats.delete(session_id);
+};
 
   socket.on("audio_call_hangup", async ({ session_id }) => {
-    await handleAudioHangup(session_id);
+    await handleAudioHangup(session_id, socket);
   });
+socket.on("call_end", async ({ session_id }) => {
+  console.log("📴 call_end received:", session_id);
 
+  await handleAudioHangup(session_id, socket);
+});
   socket.on("disconnect", async () => {
-    console.log("❌ Audio websocket instance state dropped for connection socket:", socket.id);
-    const session_id = socket.session_id;
-    if (session_id && connectedSessions.has(session_id)) {
-      await handleAudioHangup(session_id);
-    }
-  });
+  const session_id = socket.session_id;
+
+  if (session_id && connectedSessions.has(session_id)) {
+    await handleAudioHangup(session_id, socket); // ✅ pass socket
+  }
+});
 };

@@ -28,7 +28,6 @@ async function keepDbAlive() {
   }
 }
 
-// ping every 60 seconds
 setInterval(keepDbAlive, 60_000);
 
 const conn = async()=>{

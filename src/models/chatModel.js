@@ -50,8 +50,6 @@ const createConversation = async (userA, userB) => {
   return res.insertId;
 };
 
-/* ---------------- MESSAGES ---------------- */
-
 const insertMessage = async (
   conversationId,
   senderId,
