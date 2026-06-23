@@ -47,6 +47,8 @@ exports.addPhoto = async (req, res) => {
   try {
     const user_id = req.params.user_id;
 
+    console.log("PHOTO URLS:", req.body.photo_urls);
+
     const urls = req.body.photo_urls;
 
     if (!urls || urls.length === 0) {
@@ -67,6 +69,7 @@ exports.addPhoto = async (req, res) => {
       success: true,
       message: "Photos uploaded successfully",
       results,
+      photo_urls: urls,
     });
 
   } catch (error) {

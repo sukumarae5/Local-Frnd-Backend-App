@@ -12,25 +12,17 @@ const getPhotosByUserId = async (user_id) => {
 
 
 const addPhoto = async (user_id, photo_url) => {
-  console.log("Adding photo for user_id:", user_id);
-
-  const count = await photoModel.getActivePhotoCount(user_id);
-
-  if (count >= 5) {
-    throw new Error("Maximum 5 photos allowed");
+  if (!photo_url) {
+    throw new Error("Photo URL missing"); // 👈 prevents crash
   }
 
+  const count = await photoModel.getActivePhotoCount(user_id);
   const is_primary = count === 0 ? 1 : 0;
 
-  // Insert photo
   const photo_id = await photoModel.addPhoto(user_id, photo_url, is_primary);
-
-  const isFirstPhoto = count === 0;
-  console.log("isFirstPhoto:", isFirstPhoto);
 
   return {
     success: true,
-    message: "Photo uploaded successfully",
     photo_id,
   };
 };
