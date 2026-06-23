@@ -10,6 +10,7 @@ const getAllOffers = async (gender) => {
     params.push(gender);
   }
 
+  
   query += ` ORDER BY id DESC`;
 
   const [rows] = await db.query(query, params);
