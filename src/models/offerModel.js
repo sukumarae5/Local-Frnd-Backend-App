@@ -1,15 +1,24 @@
 const db = require("../config/db");
 
 const getAllOffers = async (gender) => {
-  const [rows] = await db.query(
-    `SELECT * FROM offers 
-     WHERE status = 1 
-     AND (target_audience = ? OR target_audience = 'ALL')
-     AND (start_date IS NULL OR start_date <= NOW())
-     AND (end_date IS NULL OR end_date >= NOW())
-     ORDER BY priority DESC`,
-    [gender]
-  );
+  let query = `
+    SELECT * FROM offers 
+    WHERE status = 1 
+    AND (start_date IS NULL OR start_date <= NOW())
+    AND (end_date IS NULL OR end_date >= NOW())
+  `;
+
+  let params = [];
+
+  // ✅ Apply filter only if gender is provided
+  if (gender) {
+    query += ` AND (target_audience = ? OR target_audience = 'ALL')`;
+    params.push(gender);
+  }
+
+  query += ` ORDER BY priority DESC`;
+
+  const [rows] = await db.query(query, params);
 
   return rows;
 };

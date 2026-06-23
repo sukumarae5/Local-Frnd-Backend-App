@@ -2,20 +2,19 @@ const offerService = require("../services/offerService");
 
 const getAllOffers = async (req, res) => {
   try {
-    console.log("Query:", req.query);
-    console.log("User:", req.user);
+    let gender = req.query.gender || req.user?.gender || null;
 
-    const allowed = ["MALE", "FEMALE", "ALL"];
+    const allowed = ["MALE", "FEMALE"];
 
-    let gender =
-      req.query.gender || req.user?.gender || "ALL";
-
-    // ✅ safety check
-    if (!allowed.includes(gender)) {
-      gender = "ALL";
+    // ✅ normalize
+    if (gender) {
+      gender = gender.toUpperCase();
     }
 
-    console.log("Final Gender Used:", gender);
+    // ❌ if invalid → remove filter
+    if (!allowed.includes(gender)) {
+      gender = null;
+    }
 
     const data = await offerService.getAllOffers(gender);
 
