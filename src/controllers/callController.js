@@ -258,20 +258,14 @@ const friendConnect = async (req, res) => {
        1️⃣ CHECK ONLINE FIRST
     =============================== */
     if (!socketMap.isOnline(String(friend_id))) {
-
       await notificationService.createNotification(
         caller_id,
         friend_id,
         "MISSED_CALL",
         `Missed ${call_type.toLowerCase()} call`,
-        {
-          call_type,
-          session_id: null
-        }
+        { call_type, session_id: null }
       );
-
       io.to(String(friend_id)).emit("new_notification");
-
       return res.json({ status: "USER_OFFLINE" });
     }
 
@@ -294,19 +288,18 @@ const friendConnect = async (req, res) => {
       call_type: session.type,
       status: "RINGING",
       is_friend: true,
-      call_mode: "FRIEND"
+      call_mode: "FRIEND",
+      receiver_id: friend_id,   // ✅ was missing before
     });
 
     /* ===============================
        4️⃣ RING TIMEOUT (30 sec)
     =============================== */
     const timeout = setTimeout(async () => {
-
       const full = await callService.getSessionById(session.session_id);
       if (!full) return;
 
       if (full.status === "RINGING") {
-
         await callService.endSession(session.session_id);
 
         await notificationService.createNotification(
@@ -314,19 +307,19 @@ const friendConnect = async (req, res) => {
           friend_id,
           "MISSED_CALL",
           `Missed ${session.type.toLowerCase()} call`,
-          {
-            call_type: session.type,
-            session_id: session.session_id
-          }
+          { call_type: session.type, session_id: session.session_id }
         );
 
-        io.to(String(friend_id)).emit("new_notification");
-
+        // ✅ Emit call_timeout to BOTH caller AND receiver
         io.to(String(caller_id)).emit("call_timeout", {
-          session_id: session.session_id
+          session_id: session.session_id,
         });
-      }
+        io.to(String(friend_id)).emit("call_timeout", {  // ✅ receiver dismisses IncomingCallScreen
+          session_id: session.session_id,
+        });
 
+        io.to(String(friend_id)).emit("new_notification");
+      }
     }, 30000);
 
     return res.json({
@@ -342,21 +335,20 @@ const friendConnect = async (req, res) => {
       return res.json({ status: "BUSY" });
     }
 
+    // ✅ FRIEND_BUSY — put the block RIGHT HERE inside the catch
     if (err.message === "FRIEND_BUSY") {
-
       await notificationService.createNotification(
         req.user.user_id,
         friend_id,
         "MISSED_CALL",
         `Missed ${call_type.toLowerCase()} call`,
-        {
-          call_type,
-          session_id: null
-        }
+        { call_type, session_id: null }
       );
 
+      // ✅ Notify receiver's notification badge
       getIO().to(String(friend_id)).emit("new_notification");
 
+      // ✅ No IncomingCallScreen shown when busy — nothing to dismiss on receiver
       return res.json({ status: "BUSY" });
     }
 
@@ -364,9 +356,14 @@ const friendConnect = async (req, res) => {
       return res.status(403).json({ error: "Not friends" });
     }
 
+    if (err.message === "INSUFFICIENT_BALANCE") {
+      return res.status(400).json({ error: "INSUFFICIENT_BALANCE" });
+    }
+
     return res.status(400).json({ error: err.message });
   }
 };
+
 
 const cancelMaleWaiting = async (req, res) => {
   try {
