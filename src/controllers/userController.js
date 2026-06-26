@@ -86,6 +86,17 @@ exports.deleteUserId = async (req, res) => {
   }
 };
 
+// controllers/userController.js  — add this method
+exports.updateFcmToken = async (req, res) => {
+  const { fcm_token } = req.body;
+  if (!fcm_token) return res.status(400).json({ error: "fcm_token required" });
+  await db.execute(
+    "UPDATE user SET fcm_token = ? WHERE user_id = ?",
+    [fcm_token, req.user.user_id]
+  );
+  res.json({ success: true });
+};
+
 exports.getRandomUsers = async (req, res) => {
   try {
     const currentUserId = req.user.user_id;

@@ -35,6 +35,7 @@ const offerRoutes = require("./routes/offerRoutes");
 const purchaseRoutes = require("./routes/purchaseRoutes");
 const withdrawRoutes = require("./routes/withdrawRoutes"); 
 const likeMindedRoutes = require("./routes/likeMindedRoutes");  // New route for like-minded users
+  const chatOptionsRoutes = require('./routes/chatOptionsRoutes');
 
 
 const errorHandler = require("./middlewares/errorMiddleware");
@@ -92,6 +93,8 @@ app.use('/api/lifestyle',lifestyleRoutes);
 app.use('/api/lifestylecategory',lifestylecategoryRoutes);
 app.use('/api/userlifestyle', userlifestyleRoutes);
 app.use("/api/chat", chatRoutes);
+  app.use('/api/chatoptions', chatOptionsRoutes);
+
 app.use("/api/rating", ratingRoutes);
 app.use("/api/faqs", faqRoutes);
 app.use("/api/support", supportRoutes);

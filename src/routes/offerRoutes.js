@@ -4,14 +4,40 @@ const router = express.Router();
 const offerController = require("../controllers/offerController");
 const uploadOfferImage = require("../middlewares/uploadOfferImage");
 
-router.get("/", offerController.getAllOffers);
+//////////////////////////////////////////////////////
+// Offer CRUD
+//////////////////////////////////////////////////////
 
-router.get("/:id", offerController.getOfferById);
+router.get(
+  "/",
+  offerController.getAllOffers
+);
 
-router.post("/", uploadOfferImage, offerController.addOffer);
+router.get(
+  "/:id",
+  offerController.getOfferById
+);
 
-router.put("/:id", uploadOfferImage, offerController.updateOffer);
+router.post(
+  "/",
+  uploadOfferImage,
+  offerController.createOffer
+);
 
-router.delete("/:id", offerController.deleteOffer);
+router.put(
+  "/:id",
+  uploadOfferImage,
+  offerController.updateOffer
+);
+
+router.put(
+  "/status/:id",
+  offerController.updateOfferStatus
+);
+
+router.delete(
+  "/:id",
+  offerController.deleteOffer
+);
 
 module.exports = router;

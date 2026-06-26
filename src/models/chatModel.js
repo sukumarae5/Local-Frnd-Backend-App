@@ -68,39 +68,71 @@ const insertMessage = async (
   return res.insertId;
 };
 
+// const getMessages = async (conversationId, myId, limit = 30, offset = 0) => {
+
+//   const [rows] = await db.query(
+//    `SELECT 
+//   m.*,
+
+//   0 AS delivered,   -- ✅ default = single tick
+
+//   CASE
+//     WHEN m.sender_id = ?
+//      AND EXISTS (
+//         SELECT 1
+//         FROM message_reads r
+//         WHERE r.message_id = m.message_id
+//           AND r.user_id <> ?
+//      )
+//     THEN 1
+//     ELSE 0
+//   END AS is_read
+
+// FROM messages m
+
+// WHERE m.conversation_id = ?
+//   AND m.is_deleted = 0
+
+// ORDER BY m.sent_at DESC
+// LIMIT ? OFFSET ?`,
+//     [myId, myId, conversationId, limit, offset]
+//   );
+
+//   return rows.reverse();
+// };
+
+
+
 const getMessages = async (conversationId, myId, limit = 30, offset = 0) => {
-
-  const [rows] = await db.query(
-   `SELECT 
-  m.*,
-
-  0 AS delivered,   -- ✅ default = single tick
-
-  CASE
-    WHEN m.sender_id = ?
-     AND EXISTS (
-        SELECT 1
-        FROM message_reads r
-        WHERE r.message_id = m.message_id
-          AND r.user_id <> ?
-     )
-    THEN 1
-    ELSE 0
-  END AS is_read
-
-FROM messages m
-
-WHERE m.conversation_id = ?
-  AND m.is_deleted = 0
-
-ORDER BY m.sent_at DESC
-LIMIT ? OFFSET ?`,
-    [myId, myId, conversationId, limit, offset]
-  );
-
-  return rows.reverse();
-};
-
+    const [rows] = await db.query(
+      `SELECT
+         m.*,
+         0 AS delivered,
+         CASE
+           WHEN m.sender_id = ?
+            AND EXISTS (
+              SELECT 1 FROM message_reads r
+              WHERE r.message_id = m.message_id AND r.user_id <> ?
+            )
+           THEN 1
+           ELSE 0
+         END AS is_read
+       FROM messages m
+       WHERE m.conversation_id = ?
+         AND m.is_deleted = 0
+         AND m.sent_at > COALESCE(
+           (SELECT cc.cleared_at
+            FROM chat_clears cc
+            WHERE cc.user_id = ? AND cc.conversation_id = ?
+            LIMIT 1),
+           '1970-01-01'
+         )
+       ORDER BY m.sent_at DESC
+       LIMIT ? OFFSET ?`,
+      [myId, myId, conversationId, myId, conversationId, limit, offset]
+    );
+    return rows.reverse();
+  };
 
 const deleteMessage = async (messageId, userId) => {
   const [res] = await db.query(

@@ -9,6 +9,8 @@ router.get("/profile/:id", authenticateUser, userController.getProfileById);
 router.delete("/profile/:id", authenticateUser,  userController.deleteUserId);
 router.patch("/profile", authenticateUser, userController.patchProfile);
 
+router.post("/fcm-token", authenticateUser, userController.updateFcmToken);
+
 
 router.get("/random-users", authenticateUser, userController.getRandomUsers);
 router.get("/connect/random", authenticateUser, userController.connectRandom);
