@@ -37,7 +37,7 @@ const getAllOffers = async (gender) => {
     `;
 
   const [rows] = await db.query(sql, params);
-
+console.log("🚀 ~ file: offerModel.js:49 ~ getAllOffers ~ rows:", rows)
   return rows;
 };
 

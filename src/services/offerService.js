@@ -48,7 +48,7 @@ const buildOfferResponse = async (offer) => {
 
 const getAllOffers = async (gender) => {
   const offers = await offerModel.getAllOffers(gender);
-
+console.log("Offers:", offers);
   const response = [];
 
   for (const offer of offers) {
