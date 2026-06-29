@@ -104,7 +104,7 @@ const randomMatchMale = async (male_id, type) => {
       [male_id]
     );
 
-    const rate = type === "VIDEO" ? 2 : 1;
+    const rate = type === "VIDEO" ?  60 : 10;
 
     if (!male || male.coin_balance < rate) {
       await conn.rollback();
@@ -158,7 +158,7 @@ const directMatchMale = async (male_id, female_id, type) => {
       [male_id]
     );
 
-    const rate = type === "VIDEO" ? 2 : 1;
+    const rate = type === "VIDEO" ?  60 : 10;
 
     if (!male || male.coin_balance < rate) {
       await conn.rollback();
@@ -243,7 +243,7 @@ console.log("Friend active call check result:", friendActive);
       [user_id]
     );
 
-    const rate = type === "VIDEO" ? 2 : 1;
+    const rate = type === "VIDEO" ?  60 : 10;
 
     if (!male || male.coin_balance < rate) {
       await conn.rollback();
