@@ -36,7 +36,7 @@ exports.getUserProfile = async (userId) => {
   -- avatar
   av.avatar_id,
   av.image_url AS avatar_url,
-
+  u.profile_image_url,
   -- language
 lang.id           AS language_id,
 lang.code         AS language_code,
@@ -148,18 +148,30 @@ WHERE u.user_id = ?;
   const primaryPhoto = photos.find(p => p.is_primary === 1) || null;
 
   // ❤️ AVATAR PRIORITY
-  const profile_image =
-    first.avatar_url || primaryPhoto?.url || null;
+const display_profile_image =
+  first.profile_image_url &&
+  first.profile_image_url.trim() !== ""
+    ? first.profile_image_url
+    : first.avatar_url;
 
-  const images = {
+ const images = {
     avatar: first.avatar_url,
-    profile_image,
-    gallery: photos.filter(p => p.is_primary === 0).map(p => ({
-      photo_id: p.id,
-      photo_url: p.url
-    }))
-  };
 
+    profile_image: first.profile_image_url,
+
+    display_profile_image,
+
+    has_custom_profile:
+        !!first.profile_image_url &&
+        first.profile_image_url.trim() !== "",
+
+    gallery: photos
+        .filter(p => p.is_primary === 0)
+        .map(p => ({
+            photo_id: p.id,
+            photo_url: p.url
+        }))
+};
   // 🌐 LANGUAGE
 const language = first.language_id
   ? {

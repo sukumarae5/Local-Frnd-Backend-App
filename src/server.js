@@ -1,20 +1,19 @@
-const express = require('express');
-const cors=require("cors")
+const express = require("express");
+const cors = require("cors");
 
 require("./cron/statusCleanup");
 
-const multer=require('multer')
-const upload=multer({dest:'uploads/'})
-const socketIO = require('socket.io');
-const { init } = require('./socket');
+const multer = require("multer");
+const upload = multer({ dest: "uploads/" });
+const socketIO = require("socket.io");
+const { init } = require("./socket");
 
-
-const authRoutes = require("./routes/authRoutes")
-const userRoutes= require('./routes/userRoutes')
-const photoRoutes=require('./routes/photoRoutes')
-const profileRoutes=require('./routes/profileRoutes')
-const callRoutes= require('./routes/callRoutes')
-const languageRoutes= require('./routes/languageRoutes')
+const authRoutes = require("./routes/authRoutes");
+const userRoutes = require("./routes/userRoutes");
+const photoRoutes = require("./routes/photoRoutes");
+const profileRoutes = require("./routes/profileRoutes");
+const callRoutes = require("./routes/callRoutes");
+const languageRoutes = require("./routes/languageRoutes");
 const avatarRoutes = require("./routes/avatarRoutes");
 const callHistoryRoutes = require("./routes/callHistoryRoutes");
 const friendRoutes = require("./routes/friendRoutes");
@@ -28,36 +27,34 @@ const chatRoutes = require("./routes/chatRoutes");
 const ratingRoutes = require("./routes/ratingRoutes");
 const faqRoutes = require("./routes/faqRoutes");
 const supportRoutes = require("./routes/supportRoutes");
-const notificationRoutes = require("./routes/notificationRoutes");  
-const statusRoutes = require("./routes/statusRoutes");  
-const coinPackageRoutes = require("./routes/coinPackageRoutes");  
-const offerRoutes = require("./routes/offerRoutes"); 
+const notificationRoutes = require("./routes/notificationRoutes");
+const statusRoutes = require("./routes/statusRoutes");
+const coinPackageRoutes = require("./routes/coinPackageRoutes");
+const offerRoutes = require("./routes/offerRoutes");
 const purchaseRoutes = require("./routes/purchaseRoutes");
-const withdrawRoutes = require("./routes/withdrawRoutes"); 
-const likeMindedRoutes = require("./routes/likeMindedRoutes");  // New route for like-minded users
-  const chatOptionsRoutes = require('./routes/chatOptionsRoutes');
-
+const withdrawRoutes = require("./routes/withdrawRoutes");
+const likeMindedRoutes = require("./routes/likeMindedRoutes"); // New route for like-minded users
+const chatOptionsRoutes = require("./routes/chatOptionsRoutes");
+const profileImageRoutes = require("./routes/profileImageRoutes"); // New route for profile image upload
 
 const errorHandler = require("./middlewares/errorMiddleware");
 
+const app = express();
 
-const app=express();
+app.use(cors());
 
-app.use(cors())
- 
-app.use(express.json({ limit: "1mb" }));           // for JSON
+app.use(express.json({ limit: "1mb" })); // for JSON
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
 app.use((req, res, next) => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-    next();
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
 });
 
-app.get("/api/user",(req, res)=>{
-    console.log("user route")
-    res.send("user route")
-})
-
+app.get("/api/user", (req, res) => {
+  console.log("user route");
+  res.send("user route");
+});
 
 // app.post("/api/singlephoto", upload.single('photo'),(req,res)=>{
 //     console.log("photo uploaded")
@@ -76,24 +73,23 @@ app.get("/api/user",(req, res)=>{
 //  res.json({success:true, message:"fields uploaded successfully", files:req.files})
 // })
 
-
-app.use('/api/auth', authRoutes)
-app.use('/api/user', userRoutes)
-app.use('/api/photo', photoRoutes)
-app.use('/api/userprofile',profileRoutes)
-app.use('/api/call', callRoutes)
-app.use('/api/language', languageRoutes)
+app.use("/api/auth", authRoutes);
+app.use("/api/user", userRoutes);
+app.use("/api/photo", photoRoutes);
+app.use("/api/userprofile", profileRoutes);
+app.use("/api/call", callRoutes);
+app.use("/api/language", languageRoutes);
 app.use("/api/avatars", avatarRoutes);
 app.use("/api/calls", callHistoryRoutes);
 app.use("/api/friend", friendRoutes);
 app.use("/api/location", locationRoutes);
 app.use("/api/interest", interestRoutes);
 app.use("/api/userinterest", userinterestRoutes);
-app.use('/api/lifestyle',lifestyleRoutes);
-app.use('/api/lifestylecategory',lifestylecategoryRoutes);
-app.use('/api/userlifestyle', userlifestyleRoutes);
+app.use("/api/lifestyle", lifestyleRoutes);
+app.use("/api/lifestylecategory", lifestylecategoryRoutes);
+app.use("/api/userlifestyle", userlifestyleRoutes);
 app.use("/api/chat", chatRoutes);
-  app.use('/api/chatoptions', chatOptionsRoutes);
+app.use("/api/chatoptions", chatOptionsRoutes);
 
 app.use("/api/rating", ratingRoutes);
 app.use("/api/faqs", faqRoutes);
@@ -105,30 +101,29 @@ app.use("/api/offers", offerRoutes);
 app.use("/api/purchase", purchaseRoutes);
 app.use("/api/withdraw", withdrawRoutes);
 app.use("/api/like-minded", likeMindedRoutes);
+app.use("/api/profile-image", profileImageRoutes);
 app.use(errorHandler);
-
 
 app.use("/uploads", express.static("uploads"));
 
 app.use(express.json({ limit: "50mb" }));
 
-const port=8082
+const port = 8082;
 // app.listen(port,"0.0.0.0",()=>{
 //     console.log("server is running")
 //     console.log("server is running on port", port)
 // })
 
-const server= app.listen(port,"0.0.0.0",()=>{
-    console.log("server is running on port", port)
-})
-    
-const io = socketIO(server, {
-    cors: {
-      origin: "*",  
-             methods: ["GET", "POST"],
-                  
-    },
-});     
+const server = app.listen(port, "0.0.0.0", () => {
+  console.log("server is running on port", port);
+});
 
-init(io)
+const io = socketIO(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"],
+  },
+});
+
+init(io);
 module.exports = { app, server, io };

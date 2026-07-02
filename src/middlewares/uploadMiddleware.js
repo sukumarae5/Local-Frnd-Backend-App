@@ -20,6 +20,7 @@ const upload = multer({
 
 const uploadMiddleware = upload.array("photos", 5);
 
+const uploadSingleMiddleware = upload.single("photo");
 
 const processImage = async (req, res, next) => {
   try {
@@ -63,9 +64,61 @@ const processImage = async (req, res, next) => {
   }
 };
 
+const processSingleImage = async (req, res, next) => {
+  try {
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "Image is required",
+      });
+    }
+
+    const uploadToCloudinary = () =>
+      new Promise((resolve, reject) => {
+
+        const uploadStream = cloudinary.uploader.upload_stream(
+          {
+            folder: "profile_images",
+            resource_type: "image",
+          },
+          (error, result) => {
+
+            if (error) return reject(error);
+
+            resolve(result.secure_url);
+
+          }
+        );
+
+        streamifier
+          .createReadStream(req.file.buffer)
+          .pipe(uploadStream);
+
+      });
+
+    const imageUrl = await uploadToCloudinary();
+
+    req.body.profile_image_url = imageUrl;
+
+    next();
+
+  } catch (err) {
+
+    console.log(err);
+
+    return res.status(500).json({
+      success: false,
+      message: "Image upload failed",
+    });
+
+  }
+};
 
 module.exports = {
   uploadMiddleware,
   processImage,
+  uploadSingleMiddleware,
+  processSingleImage,
 };
 

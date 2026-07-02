@@ -223,20 +223,20 @@ console.log("Connected call details:", row);
       call_type: row.type,
 
       caller: {
-        user_id: row.caller_id,
-        name: row.caller_name,
-        gender: row.caller_gender,
-        bio: row.caller_bio,
-        avatar: row.caller_avatar
-      },
+  user_id: row.caller_id,
+  name: row.caller_name,
+  gender: row.caller_gender,
+  bio: row.caller_bio,
+  display_profile_image: row.caller_display_image
+},
 
-      connected_user: {
-        user_id: row.receiver_id,
-        name: row.receiver_name,
-        gender: row.receiver_gender,
-        bio: row.receiver_bio,
-        avatar: row.receiver_avatar
-      }
+connected_user: {
+  user_id: row.receiver_id,
+  name: row.receiver_name,
+  gender: row.receiver_gender,
+  bio: row.receiver_bio,
+  display_profile_image: row.receiver_display_image
+}
     });
 
   } catch (err) {

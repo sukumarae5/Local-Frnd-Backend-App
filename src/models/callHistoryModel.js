@@ -1,6 +1,5 @@
 const db = require("../config/db");
 
-
 exports.getUserHistory = async (userId) => {
   const [rows] = await db.execute(
     `
@@ -21,7 +20,7 @@ exports.getUserHistory = async (userId) => {
     WHERE caller_id = ? OR receiver_id = ?
     ORDER BY started_at DESC
     `,
-    [userId, userId, userId]
+    [userId, userId, userId],
   );
   return rows;
 };
@@ -55,7 +54,12 @@ exports.getRecentUsers = async (userId) => {
         u.is_online,
         u.last_seen,
 
-        a.image_url AS avatar,
+        CASE
+          WHEN u.profile_image_url IS NOT NULL
+               AND u.profile_image_url <> ''
+          THEN u.profile_image_url
+          ELSE a.image_url
+        END AS display_profile_image,
 
         ROW_NUMBER() OVER (
           PARTITION BY
@@ -69,7 +73,7 @@ exports.getRecentUsers = async (userId) => {
       FROM call_sessions cs
 
       LEFT JOIN user u
-        ON u.user_id = 
+        ON u.user_id =
           CASE
             WHEN cs.caller_id = ? THEN cs.receiver_id
             ELSE cs.caller_id
@@ -83,13 +87,11 @@ exports.getRecentUsers = async (userId) => {
     WHERE rn = 1
     ORDER BY started_at DESC
     `,
-    [userId, userId, userId, userId, userId]
+    [userId, userId, userId, userId, userId],
   );
 
-  console.log("Recent Users:", rows);
   return rows;
 };
-
 /* ===============================
    HISTORY WITH ONE USER
 ================================ */
@@ -104,7 +106,7 @@ exports.getHistoryWithUser = async (userId, otherUserId) => {
       (caller_id = ? AND receiver_id = ?)
     ORDER BY started_at DESC
     `,
-    [userId, otherUserId, otherUserId, userId]
+    [userId, otherUserId, otherUserId, userId],
   );
   return rows;
 };
@@ -121,7 +123,6 @@ exports.getAllCallHistory = async () => {
 };
 
 exports.getUserCallHistory = async (userId) => {
-
   const query = `
     SELECT *
     FROM call_sessions
@@ -133,4 +134,3 @@ exports.getUserCallHistory = async (userId) => {
 
   return rows;
 };
- 
