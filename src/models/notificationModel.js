@@ -8,7 +8,7 @@ const create = async (
   type,
   message,
   callType = null,
-  sessionId = null
+  sessionId = null,
 ) => {
   try {
     // ── Dedup check ──────────────────────────────────────────────
@@ -47,7 +47,7 @@ const create = async (
 
     if (recent) {
       console.log(
-        `⚠️ Dedup blocked [${type}] from ${senderId} → ${receiverId} (id: ${recent.id})`
+        `⚠️ Dedup blocked [${type}] from ${senderId} → ${receiverId} (id: ${recent.id})`,
       );
       return recent.id;
     }
@@ -57,12 +57,11 @@ const create = async (
       `INSERT INTO notifications
          (sender_id, receiver_id, type, message, call_type, session_id)
        VALUES (?, ?, ?, ?, ?, ?)`,
-      [senderId, receiverId, type, message, callType, sessionId]
+      [senderId, receiverId, type, message, callType, sessionId],
     );
 
     console.log(`✅ Notification created [${type}] id: ${result.insertId}`);
     return result.insertId;
-
   } catch (err) {
     console.error("❌ Notification create error:", err.message);
     throw err;
@@ -73,7 +72,7 @@ const create = async (
 const getFcmToken = async (userId) => {
   const [[row]] = await db.execute(
     "SELECT fcm_token FROM user WHERE user_id = ?",
-    [userId]
+    [userId],
   );
   return row?.fcm_token || null;
 };
@@ -82,15 +81,21 @@ const getByUser = async (userId) => {
   const [rows] = await db.execute(
     `SELECT
        n.*,
-       u.name      AS sender_name,
-       a.image_url AS avatar_url
+       u.name AS sender_name,
+       a.image_url AS avatar_url,
+       CASE
+         WHEN u.profile_image_url IS NOT NULL
+              AND u.profile_image_url <> ''
+         THEN u.profile_image_url
+         ELSE a.image_url
+       END AS display_profile_image
      FROM notifications n
      JOIN user u         ON u.user_id   = n.sender_id
      LEFT JOIN avatars a ON a.avatar_id = u.avatar_id
      WHERE n.receiver_id = ?
      ORDER BY n.created_at DESC
      LIMIT 100`,
-    [userId]
+    [userId],
   );
   return rows;
 };
@@ -98,7 +103,7 @@ const getByUser = async (userId) => {
 const markRead = async (userId) => {
   await db.execute(
     "UPDATE notifications SET is_read = 1 WHERE receiver_id = ? AND is_read = 0",
-    [userId]
+    [userId],
   );
 };
 
@@ -107,7 +112,7 @@ const unreadCount = async (userId) => {
     `SELECT COUNT(*) AS unread
      FROM notifications
      WHERE receiver_id = ? AND is_read = 0`,
-    [userId]
+    [userId],
   );
   return row.unread;
 };
@@ -120,7 +125,7 @@ const updateFriendRequestToAccepted = async (senderId, receiverId) => {
      WHERE sender_id   = ?
        AND receiver_id = ?
        AND type        = 'FRIEND_REQUEST'`,
-    [senderId, receiverId]
+    [senderId, receiverId],
   );
 };
 
@@ -130,7 +135,7 @@ const deleteFriendRequestNotification = async (senderId, receiverId) => {
      WHERE sender_id   = ?
        AND receiver_id = ?
        AND type        = 'FRIEND_REQUEST'`,
-    [senderId, receiverId]
+    [senderId, receiverId],
   );
 };
 
@@ -139,10 +144,9 @@ const deleteFriendshipNotifications = async (user1, user2) => {
     `DELETE FROM notifications
      WHERE (sender_id = ? AND receiver_id = ?)
         OR (sender_id = ? AND receiver_id = ?)`,
-    [user1, user2, user2, user1]
+    [user1, user2, user2, user1],
   );
 };
-
 
 const deleteMessageNotification = async (senderId, receiverId) => {
   await db.execute(
@@ -150,7 +154,7 @@ const deleteMessageNotification = async (senderId, receiverId) => {
      WHERE sender_id = ?
        AND receiver_id = ?
        AND type = 'MESSAGE'`,
-    [senderId, receiverId]
+    [senderId, receiverId],
   );
 };
 

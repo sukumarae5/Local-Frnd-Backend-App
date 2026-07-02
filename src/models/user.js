@@ -77,9 +77,45 @@ const clearOtp = async (mobile_number) => {
 };
 
 const findById = async (id) => {
-  const [rows] = await db.execute(`SELECT * from user WHERE user_id=?`, [id]);
-  return rows[0];
+
+    const [rows] = await db.execute(
+
+        `
+        SELECT
+
+            u.*,
+
+            a.image_url AS avatar_image,
+
+            CASE
+
+                WHEN u.profile_image_url IS NOT NULL
+                     AND u.profile_image_url <> ''
+
+                THEN u.profile_image_url
+
+                ELSE a.image_url
+
+            END AS display_profile_image
+
+        FROM user u
+
+        LEFT JOIN avatars a
+               ON a.avatar_id = u.avatar_id
+
+        WHERE u.user_id=?
+
+        LIMIT 1
+        `,
+
+        [id]
+
+    );
+
+    return rows[0];
+
 };
+
 const updateCoinBalance = async (user_id, coins) => {
   const [result] = await db.execute(
     `UPDATE user SET coin_balance = coin_balance + ? WHERE user_id=?`,
@@ -121,30 +157,34 @@ const deleteUserId = async (user_id) => {
 const getRandomUsers = async (currentUserId) => {
   const [rows] = await db.execute(
     `
-    SELECT 
+    SELECT
       u.user_id,
       u.name,
-      COALESCE(
-        (
-          SELECT photo_url
-          FROM profile_photo
-          WHERE user_id = u.user_id
-            AND is_primary = 1
-          LIMIT 1
-        ), ""
-      ) AS primary_image
+      u.is_online,
+
+      CASE
+        WHEN u.profile_image_url IS NOT NULL
+             AND u.profile_image_url <> ''
+        THEN u.profile_image_url
+        ELSE a.image_url
+      END AS display_profile_image
+
     FROM user u
+
+    LEFT JOIN avatars a
+      ON a.avatar_id = u.avatar_id
+
     WHERE u.user_id != ?
       AND u.is_online = 1
+
     ORDER BY RAND()
     LIMIT 20
     `,
-    [currentUserId],
+    [currentUserId]
   );
 
   return rows;
 };
-
 // 🔹 Check if state belongs to country
 const isValidStateForCountry = async (state_id, country_id) => {
   const [rows] = await db.execute(

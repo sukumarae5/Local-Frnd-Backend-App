@@ -163,43 +163,30 @@ const endSession = async (session_id) => {
 };
 
 
-// const getSearchingFemales = async () => {
-//   const [rows] = await db.execute(
-//     `
-//     SELECT
-//       cs.session_id,
-//       cs.type,
-//       u.user_id
-//     FROM call_sessions cs
-//     JOIN user u ON u.user_id = cs.caller_id
-//     WHERE cs.status = 'SEARCHING'
-//       AND u.gender = 'Female'
-//        AND u.is_online = 1
-//     ORDER BY cs.created_at DESC
-//     `
-//   );
-// console.log("getSearchingFemales - rows:", rows); 
-//   return rows;
-// };
-
-
 const getSearchingFemales = async (filters = {}) => {
 
-  let sql = `
-    SELECT
-      cs.session_id,
-      cs.type,
-      u.user_id,
-      u.name,
-      u.language_id,
-      u.country_id,
-      u.state_id,
-      u.city_id,
-      u.is_online
-    FROM call_sessions cs
-    JOIN user u 
-      ON u.user_id = cs.caller_id
-  `;
+ let sql = `
+  SELECT
+    cs.session_id,
+    cs.type,
+    u.user_id,
+    u.name,
+    u.language_id,
+    u.country_id,
+    u.state_id,
+    u.city_id,
+    u.is_online,
+    CASE
+      WHEN u.profile_image_url IS NOT NULL AND u.profile_image_url <> ''
+      THEN u.profile_image_url
+      ELSE a.image_url
+    END AS display_profile_image
+  FROM call_sessions cs
+  JOIN user u 
+    ON u.user_id = cs.caller_id
+  LEFT JOIN avatars a
+    ON a.avatar_id = u.avatar_id
+`;
 
   const params = [];
   const conditions = [];
@@ -302,7 +289,6 @@ const cancelFemaleSearchTx = async (conn, female_id) => {
 };
 
 
-// ✅ REPLACE getConnectedCallBothUsers
 const getConnectedCallBothUsers = async (user_id) => {
   const [rows] = await db.execute(
     `
@@ -313,12 +299,20 @@ const getConnectedCallBothUsers = async (user_id) => {
       cu.name        AS caller_name,
       cu.gender      AS caller_gender,
       cu.bio         AS caller_bio,
-      ca.image_url   AS caller_avatar,
+      CASE
+        WHEN cu.profile_image_url IS NOT NULL AND cu.profile_image_url <> ''
+        THEN cu.profile_image_url
+        ELSE ca.image_url
+      END AS caller_display_image,
       ru.user_id     AS receiver_id,
       ru.name        AS receiver_name,
       ru.gender      AS receiver_gender,
       ru.bio         AS receiver_bio,
-      ra.image_url   AS receiver_avatar
+      CASE
+        WHEN ru.profile_image_url IS NOT NULL AND ru.profile_image_url <> ''
+        THEN ru.profile_image_url
+        ELSE ra.image_url
+      END AS receiver_display_image
     FROM call_sessions cs
     JOIN user cu ON cu.user_id = cs.caller_id
     LEFT JOIN avatars ca ON ca.avatar_id = cu.avatar_id
@@ -331,7 +325,6 @@ const getConnectedCallBothUsers = async (user_id) => {
     `,
     [user_id, user_id]
   );
-  console.log("getConnectedCallBothUsers - rows:", rows);
   return rows[0] || null;
 };
 
